@@ -10226,4 +10226,78 @@ title();
     if(taps.length>=7){taps=[];build();}
   },true);
 })();
+/* v42 시작 화면 '업데이트 기록' — 버튼 + 팝업 + NEW 표시.
+   - 시작 화면(title)이 그려진 뒤에만 버튼을 끼워 넣는다. 게임 진행 화면에는 만들지 않는다. 시작·진행 로직은 건드리지 않는다.
+   - 기록은 UPDATE_LOG 배열에 날짜별로 쌓는다(맨 앞이 최신). 새 업데이트는 배열 맨 앞에 항목 하나만 추가하면 되고, 이전 기록은 그대로 남는다.
+   - 확인 여부: localStorage 'tengri_updlog_seen'(기존 저장 키와 별도)에 마지막으로 확인한 기록의 id를 저장한다.
+     id 가 그보다 큰 기록이 있으면 NEW 를 보여 준다. 저장소를 못 쓰는 환경에서는 새로고침 전까지만 유지된다. */
+const UPDATE_LOG=[
+  {id:'2026/11/10',date:'2026/11/10',title:'11/10 업데이트',sections:[
+    {h:'새로운 콘텐츠',items:[
+      '새로운 직업 6종 (염색공, 유모, 음악가, 대장장이, 사냥꾼, 의원) 추가',
+      '직업별 일상 이벤트 추가',
+      '황금씨족과의 혼인 기회',
+      '추천을 통한 고위 관직 임명',
+      '관직 사임과 해임 이벤트',
+      '입양 및 양자 이벤트',
+      '배우자의 동반 석방'
+    ]}
+  ]}
+];
+const V42_KEY='tengri_updlog_seen';
+let v42Mem='';
+const v42Seen=()=>{try{const s=localStorage.getItem(V42_KEY);return s==null?v42Mem:s;}catch(e){return v42Mem;}};
+const v42Save=v=>{v42Mem=v;try{localStorage.setItem(V42_KEY,v);}catch(e){}};
+const v42Latest=()=>UPDATE_LOG.reduce((a,e)=>e.id>a?e.id:a,'');
+const v42HasNew=()=>UPDATE_LOG.length>0&&v42Latest()>v42Seen();
+function v42Style(){
+  if(document.getElementById('v42css'))return;
+  const s=document.createElement('style');s.id='v42css';
+  s.textContent=`
+#updlog{margin-top:10px;position:relative}
+#updlog .newtag{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;background:var(--gold);color:var(--tan-ink);font-size:11px;font-weight:700;letter-spacing:.04em;vertical-align:middle;line-height:1.5}
+#updModal{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top,0px)) 16px max(16px,env(safe-area-inset-bottom,0px));background:rgba(8,6,3,.72)}
+#updModal .box{width:100%;max-width:440px;max-height:min(80vh,640px);max-height:min(80dvh,640px);display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--gold2);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.55)}
+#updModal .body{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px 18px 6px}
+#updModal .ent+.ent{margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+#updModal h2{margin:0;font-size:18px;font-weight:700;color:var(--gold)}
+#updModal .dt{margin:3px 0 12px;font-size:12.5px;color:var(--dim)}
+#updModal h3{margin:0 0 6px;font-size:14px;font-weight:700;color:var(--ink)}
+#updModal ul{margin:0;padding-left:18px}
+#updModal li{margin:4px 0;font-size:14.5px;line-height:1.6;color:var(--ink)}
+#updModal .ft{padding:12px 18px 16px}`;
+  document.head.appendChild(s);
+}
+function v42Close(){
+  const m=document.getElementById('updModal');if(m)m.remove();
+  document.body.style.overflow=v42Close.prev||'';
+  document.removeEventListener('keydown',v42Key);
+  const t=document.getElementById('updlog');if(t)t.focus&&t.focus();
+}
+function v42Key(e){if(e.key==='Escape')v42Close();}
+function v42Open(){
+  v42Style();if(document.getElementById('updModal'))return;
+  const x=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const ents=UPDATE_LOG.slice().sort((a,b)=>a.id<b.id?1:a.id>b.id?-1:0).map(e=>`<div class="ent"><h2>${x(e.title)}</h2><div class="dt">${x(e.date)}</div>${e.sections.map(s=>`<h3>${x(s.h)}</h3><ul>${s.items.map(i=>`<li>${x(i)}</li>`).join('')}</ul>`).join('')}</div>`).join('');
+  const m=document.createElement('div');m.id='updModal';m.setAttribute('role','dialog');m.setAttribute('aria-modal','true');m.setAttribute('aria-label','업데이트 기록');
+  m.innerHTML=`<div class="box"><div class="body">${ents}</div><div class="ft"><button class="btn" id="updClose" type="button">닫기</button></div></div>`;
+  m.addEventListener('click',e=>{if(e.target===m||e.target.closest('#updClose'))v42Close();});
+  document.body.appendChild(m);
+  v42Close.prev=document.body.style.overflow;document.body.style.overflow='hidden';
+  document.addEventListener('keydown',v42Key);
+  v42Save(v42Latest());
+  const t=document.getElementById('updlog'),n=t&&t.querySelector('.newtag');if(n)n.remove();
+  const c=document.getElementById('updClose');if(c)c.focus();
+}
+function v42Mount(){
+  if(V.screen!=='title'||document.getElementById('updlog'))return;
+  v42Style();
+  const anchor=document.getElementById('resume')||document.getElementById('go');if(!anchor)return;
+  const b=document.createElement('button');b.className='btn';b.id='updlog';b.type='button';
+  b.innerHTML='업데이트 기록'+(v42HasNew()?'<span class="newtag">NEW</span>':'');
+  b.addEventListener('click',v42Open);
+  anchor.insertAdjacentElement('afterend',b);
+}
+(function(){const t=title;title=function(){const r=t.apply(this,arguments);try{v42Mount();}catch(e){}return r;};})();
+try{v42Mount();}catch(e){} /* ui.js 가 먼저 그린 첫 시작 화면에도 버튼을 붙인다 */
 </script>
