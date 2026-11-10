@@ -2046,6 +2046,7 @@ function kinNews(){
       if(isSp||isKid)o.newsAlive=1; /* 배우자·자녀는 생존 소식을 한 사람에게 한 번만 전한다 */
     }
     recapLine(lead+t);
+    v16card(dead?'고향의 부음':'고향의 소식',`${role} · ${o.name}`,lead+t,dead?'down':'up',/상인이 지나가며|먼 친척을 통해|전언이 닿았다|부음을/);
     return;
   }
 }
@@ -3243,7 +3244,7 @@ function beginYear(){
   else{k=(r.auto&&!r.lock)?autoFocus():validFocus(r.focus||autoFocus());r.focus=k;r.lock=false;train(k,1);}
   yearHook();
   }finally{G._defer0=G._defer;G._defer=null;}
-  const rec=G.recap;
+  const rec=G.recap;babyRecheck(rec);
   const items=[];
   const lines=[];const act=actLine(k);if(act)lines.push(act);rec.lines.forEach(l=>lines.push(l));
   if(!lines.length)lines.push(R(QUIET));
@@ -3537,13 +3538,20 @@ function babyLines(){
   const pool=babyPool(a).filter(t=>!P.bu[t]);
   const n=chance(.6)?2:1;
   for(let i=0;i<n&&pool.length;i++){
-    const j=ri(0,pool.length-1);const t=pool.splice(j,1)[0];P.bu[t]=1;recapLine(t);
+    const j=ri(0,pool.length-1);const t=pool.splice(j,1)[0];P.bu[t]=1;recapLine(t);(G.recap.baby=G.recap.baby||{a,t:[]}).t.push(t);
   }
   /* 능력은 놀이와 환경 속에서 조금씩 자란다 (스스로 고르지 않는다) */
   const mg=isMg(P);
   const k=mg?R(['ride','arch','wit','know']):R(['craft','know','wit']);
   if(a>=2&&chance(.5))fx({[k]:ri(1,2)});
   if(chance(.3))fx({hp:ri(1,2)});
+}
+/* 한 해 초에 만든 영유아 일상 문장은, 그 해 안에 일어난 사건(포로·매각 등으로 가족과 갈림)이 끝난 뒤의 상태로 다시 확인한다.
+   더는 성립하지 않는 문장(곁에 없는 아버지·어머니·형제와의 장면)은 내보내지 않는다 */
+function babyRecheck(rec){
+  const b=rec&&rec.baby;if(!b||!b.t.length||P.dead)return;
+  let now;try{now=babyPool(b.a);}catch(e){return;}
+  b.t.forEach(t=>{if(now.indexOf(t)<0){const i=rec.lines.indexOf(t);if(i>=0)rec.lines.splice(i,1);if(P.bu)delete P.bu[t];}});
 }
 /* 영유아 사망과 병치레는 부모·가문의 돌봄에 달려 있다 */
 function babyDeath(){
@@ -6889,17 +6897,27 @@ V7POOLS.push(
    매매(v12_master_sold)로 주인이 바뀌면 곁의 배우자·자녀가 ① 플레이어만 이동 ② 전체 함께 이동 ③ 일부만 이동 중 하나로 나뉜다.
    이동한 가족은 o.owner=새 주인 이름, 남은 가족은 o.owner=옛 주인 이름 + o.away=true, o.apart='sold'(함께 지내거나 직접 만나는 이벤트에서 제외).
    혼인·친자 관계, 신분(status)은 그대로 둔다. 해방·가족 일괄 해방 같은 규칙은 만들지 않는다. */
+/* 팔려 갈 때 본가 식구(부모·형제자매)는 같은 집에 남는다: 소식이 끊긴 사람으로 기록한다(드물게 함께 팔려 가면 곁에 둔다) */
+function v16natalApart(old,nm,together){
+  const ok=o=>!!o&&o.alive&&!o.lost&&!o.away&&!o.apart&&!o.hidden&&!o.captive&&!o.absent&&!o.pend&&!o.wed&&!o.warTogether;
+  [[P.father,'아버지'],[P.mother,'어머니']].concat((P.sibs||[]).map(s=>[s,sibWord(s)])).forEach(([o,lab])=>{
+    if(!ok(o))return;
+    if(together&&chance(.3)){o.owner=nm.name;return;}
+    o.owner=old.name;o.away=true;o.apart='raid';o.known={age:o.age||0,year:P.year,stay:1};
+  });
+}
 function v16sale(old,nm){
   const pool=[];
   const add=(o,lab)=>{if(o&&o.alive&&!o.lost&&!o.away&&o.apart!=='sold')pool.push({o,lab});};
   add(P.spouse,'배우자');(P.kids||[]).forEach(k=>add(k,k.female?'딸':'아들'));
   const r=Math.random();let mode,move;
-  if(!pool.length){P.flags.v16_sale={year:P.year,from:old.name,to:nm.name,mode:'alone',moved:[],stayed:[]};return;}
+  if(!pool.length){v16natalApart(old,nm,false);P.flags.v16_sale={year:P.year,from:old.name,to:nm.name,mode:'alone',moved:[],stayed:[]};return;}
   if(r<.4)mode='alone';else if(r<.75||pool.length<2)mode='all';else mode='part';
   if(mode==='alone')move=[];
   else if(mode==='all')move=pool.slice();
   else{move=pool.filter(()=>Math.random()<.5);if(!move.length)move=[pool[0]];if(move.length===pool.length)move=pool.slice(1);}
   const mv=new Set(move.map(x=>x.o));
+  v16natalApart(old,nm,mode==='all'&&move.length===pool.length);
   pool.forEach(x=>{
     if(mv.has(x.o)){x.o.owner=nm.name;}
     else{x.o.owner=old.name;x.o.away=true;x.o.apart='sold';x.o.soldY=P.year;}
