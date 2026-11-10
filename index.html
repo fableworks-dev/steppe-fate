@@ -2830,6 +2830,7 @@ function warStartLog(kind,attacker,place,note){
     return s;
   };
 }
+const planSceneLive=sc=>!sc||((!sc.kin||sibReach(sc.kin))&&(!sc.vis||wedVisitLive(sc.vis)));
 /* ===== v5: 혼인·부족 규칙, 안다, 시녀 진로, 연중 일정표 루프 ===== */
 
 /* ----- 이름 확장 ----- */
@@ -3321,8 +3322,8 @@ function tick(dt){
     const it=pl.items[pl.i++];ch=true;
     if(it.type==='line')emitLine(it);
     else if(it.type==='card')feedPush(it.card);
-    else if(it.type==='ev'){inlineEvent(it.scene);}
-    else if(it.type==='scene'){G.scene=it.scene;r.dec=0;break;}
+    else if(it.type==='ev'){if(planSceneLive(it.scene))inlineEvent(it.scene);}
+    else if(it.type==='scene'){if(!planSceneLive(it.scene))continue;G.scene=it.scene;r.dec=0;break;} /* 한 해 계획에 미리 들어간 장면이라도, 그 사이 포로·헤어짐 등으로 소식이 끊긴 가족과의 장면이면 건너뛴다(nextScene 의 대기열 검사와 같은 기준) */
     else if(it.type==='birth'){
       const bs=v16birthTick(it);
       if(P.dead){G.scene={kind:'end',title:'삶의 끝'};afterScene();break;}
@@ -10252,8 +10253,27 @@ const UPDATE_LOG=[
       '황금씨족과의 혼인 및 고위관직 임명·사임·해임 기회 개선',
       '화면 및 텍스트 개선 및 오류 수정'
     ]}
+  ]},
+  {id:'2026/11/10b',date:'2026/11/10',title:'11/10 추가 업데이트',sections:[
+    {h:'수정·추가',items:[
+      '오류 수정',
+      '사망 사건 추가'
+    ]}
+  ]},
+  {id:'2026/11/10',date:'2026/11/10',title:'11/10 업데이트',sections:[
+    {h:'새로운 콘텐츠',items:[
+      '새로운 직업 6종 (염색공, 유모, 음악가, 대장장이, 사냥꾼, 의원) 추가',
+      '직업별 일상 이벤트 추가',
+      '황금씨족과의 혼인 기회',
+      '추천을 통한 고위 관직 임명',
+      '관직 사임과 해임 이벤트',
+      '입양 및 양자 이벤트',
+      '배우자의 동반 석방'
+    ]}
   ]}
 ];
+/* 기록이 V42_FOLD_AT건 이상이면 최신 V42_SHOW건만 펼쳐 보이고, 더 오래된 기록은 '이전 업데이트 더보기' 버튼 뒤에 접어 둔다(누르면 펼침) */
+const V42_FOLD_AT=12,V42_SHOW=10;
 const V42_KEY='tengri_updlog_seen';
 let v42Mem='';
 const v42Seen=()=>{try{const s=localStorage.getItem(V42_KEY);return s==null?v42Mem:s;}catch(e){return v42Mem;}};
@@ -10275,6 +10295,8 @@ function v42Style(){
 #updModal h3{margin:0 0 6px;font-size:14px;font-weight:700;color:var(--ink)}
 #updModal ul{margin:0;padding-left:18px}
 #updModal li{margin:4px 0;font-size:14.5px;line-height:1.6;color:var(--ink)}
+#updOld .ent:first-child{margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+#updModal .more{margin:16px 0 14px;padding:9px 16px;font-size:14px;width:auto;min-height:0}
 #updModal .ft{padding:12px 18px 16px}`;
   document.head.appendChild(s);
 }
@@ -10288,10 +10310,12 @@ function v42Key(e){if(e.key==='Escape')v42Close();}
 function v42Open(){
   v42Style();if(document.getElementById('updModal'))return;
   const x=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const ents=UPDATE_LOG.slice().sort((a,b)=>a.id<b.id?1:a.id>b.id?-1:0).map(e=>`<div class="ent"><h2>${x(e.title)}</h2><div class="dt">${x(e.date)}</div>${e.sections.map(s=>`<h3>${x(s.h)}</h3><ul>${s.items.map(i=>`<li>${x(i)}</li>`).join('')}</ul>`).join('')}</div>`).join('');
+  const one=e=>`<div class="ent"><h2>${x(e.title)}</h2><div class="dt">${x(e.date)}</div>${e.sections.map(s=>`<h3>${x(s.h)}</h3><ul>${s.items.map(i=>`<li>${x(i)}</li>`).join('')}</ul>`).join('')}</div>`;
+  const srt=UPDATE_LOG.slice().sort((a,b)=>a.id<b.id?1:a.id>b.id?-1:0),fold=srt.length>=V42_FOLD_AT;
+  const ents=(fold?srt.slice(0,V42_SHOW):srt).map(one).join('')+(fold?`<div id="updOld" hidden>${srt.slice(V42_SHOW).map(one).join('')}</div><button class="btn more" id="updMore" type="button" aria-expanded="false">이전 업데이트 더보기</button>`:'');
   const m=document.createElement('div');m.id='updModal';m.setAttribute('role','dialog');m.setAttribute('aria-modal','true');m.setAttribute('aria-label','업데이트 기록');
   m.innerHTML=`<div class="box"><div class="body">${ents}</div><div class="ft"><button class="btn" id="updClose" type="button">닫기</button></div></div>`;
-  m.addEventListener('click',e=>{if(e.target===m||e.target.closest('#updClose'))v42Close();});
+  m.addEventListener('click',e=>{if(e.target===m||e.target.closest('#updClose')){v42Close();return;}const mb=e.target.closest('#updMore');if(mb){const o=m.querySelector('#updOld');if(o)o.hidden=false;mb.remove();}});
   document.body.appendChild(m);
   v42Close.prev=document.body.style.overflow;document.body.style.overflow='hidden';
   document.addEventListener('keydown',v42Key);
