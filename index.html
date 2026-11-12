@@ -2046,7 +2046,6 @@ function kinNews(){
       if(isSp||isKid)o.newsAlive=1; /* 배우자·자녀는 생존 소식을 한 사람에게 한 번만 전한다 */
     }
     recapLine(lead+t);
-    v16card(dead?'고향의 부음':'고향의 소식',`${role} · ${o.name}`,lead+t,dead?'down':'up',/상인이 지나가며|먼 친척을 통해|전언이 닿았다|부음을/);
     return;
   }
 }
@@ -2082,13 +2081,18 @@ function newSiblingScene0(s){
 }
 /* 아버지 사망 후 아들 시점의 가축 상속 (Manus inherit_herd): 남성·초원·신분 3(4 이상은 족장 계승 사건 대상)·15세 이상. 재산 +6 */
 function inheritHerd(){
+  if(typeof v52selfHeir==='function'&&v52selfHeir(P)){ /* 플레이어가 막내 후보: 아버지의 화덕과 천막을 이어받는 쪽 */
+    const bro=(P.sibs||[]).some(s=>s&&!s.female&&s.older&&!s.hidden);
+    v7L(bro?'아버지가 남긴 가축과 천막을 형제들이 나누었다. 막내인 {me}은(는) 오랜 관습에 따라 아버지의 화덕과 천막을 이어받아 집안의 살림을 지키게 되었다.'
+            :'아버지가 남긴 가축과 천막을 {me}이(가) 이어받았다. 아버지의 화덕을 지키며 집안의 살림을 이끌게 되었다.','m_ochigin');
+  }else
   v7L('아버지가 남긴 가축과 천막을 형제들이 나누었다. 막내가 아버지의 화덕을 이어받는 오랜 관습에 따라 큰 몫은 막내 형제에게 돌아갔고, {me}은(는) 몇 마리의 말과 양을 얻었다.','m_ochigin');
   fx({wealth:6});addLog('아버지의 가축을 나누어 받았다.');
 }
 function inheritScene(){
   const s=R(P.sibs.filter(s=>sibReach(s)&&s.age>=12));
   const w=sibWord(s);
-  return kinScene(s,sc('유산을 둘러싼 갈등',`아버지의 장례가 끝나자 ${w} ${s.name}이(가) 가축과 재산의 몫을 다시 따지자고 한다. ${nomadHome(P)?'초원에서는 막내가 아버지의 천막을 지키고':'막내가 아버지의 집을 지키고'} 형들이 몫을 받아 나가는 것이 관습이지만, 사람 마음이 늘 그렇지는 않다.`,[
+  return kinScene(s,sc('유산을 둘러싼 갈등',`아버지의 장례가 끝나자 ${w} ${s.name}이(가) 가축과 재산의 몫을 다시 따지자고 한다. ${nomadHome(P)?(typeof v52selfHeir==='function'&&v52selfHeir(P)?'초원에서는 막내인 당신이 아버지의 천막을 지키고':'초원에서는 막내가 아버지의 천막을 지키고'):'막내가 아버지의 집을 지키고'} 형들이 몫을 받아 나가는 것이 관습이지만, 사람 마음이 늘 그렇지는 않다.`,[
     {t:'관습대로 나눈다',fn:()=>{s.bond=clamp(s.bond+3);fx({wealth:ri(-3,3),wit:2});return '관습에 따라 몫을 나누었다. 불만이 아주 없지는 않았지만 큰 다툼은 없었다.';}},
     {t:'내 몫을 더 요구한다',fn:()=>{s.bond=clamp(s.bond-25);P.harmony=clamp(P.harmony-8);fx({wealth:ri(3,10),fame:-3});return `${s.name}과(와) 서로 언성을 높이다 등을 돌렸다. 몫은 더 얻었지만 형제의 얼굴을 한동안 보지 않았다.`;}},
     {t:'기꺼이 양보한다',fn:()=>{s.bond=clamp(s.bond+20);P.harmony=clamp(P.harmony+6);fx({wealth:-ri(4,9),fame:4,wit:2});return `${s.name}에게 양보하자 형제의 눈시울이 붉어졌다. 이 일로 이웃들이 당신을 의리 있는 사람이라 했다.`;}}
@@ -3707,8 +3711,8 @@ const V7REL=P=>({teng:'tengri',nest:'nestorian',muslim:'islam',orth:'orthodox',c
 const v7nf=P=>P.status==='free';
 const v7slave=P=>P.status==='slave'||P.status==='captive';
 /* 곁에 없는 자녀(매각·고향에 남음): 함께 지내는 장면(양육·병치레·사춘기·혼사 준비)의 대상에서 뺀다. 소식(kinNews)은 별도 경로로 전해진다 */
-const kidAway=k=>!!k&&(k.apart==='sold'||k.apart==='left');
-const v7kids=P=>(P.kids||[]).filter(k=>k.alive&&k.apart!=='sold'&&k.apart!=='left'); /* 매매로 헤어져 지내는 자녀는 곁에 없다 */
+const kidAway=k=>!!k&&(k.apart==='sold'||k.apart==='left'||(typeof v52ind==='function'&&v52ind(k))); /* 독립한 자녀(v52_children.js)도 곁에 없는 자녀로 본다 */
+const v7kids=P=>(P.kids||[]).filter(k=>k.alive&&k.apart!=='sold'&&k.apart!=='left'&&!(typeof v52ind==='function'&&v52ind(k))); /* 매매로 헤어져 지내는 자녀는 곁에 없다 */
 const v7sp=P=>(P.spouse&&P.spouse.alive)?P.spouse.name:'배우자';
 function v7bt(w){
   w=w.replace(/[\s)\]'"(”’]+$/,'');if(!w)return -1;
@@ -4721,7 +4725,16 @@ v9run('c_sib_bad',.9,P=>P.age>=16&&P.rank>=3&&aliveSibs(P).some(s=>s.age>=12&&s.
 
 /* ---------- 노년 ---------- */
 /* inheritance : 현재의 '유산을 둘러싼 갈등'(형제 사이 상속 분쟁)과 달리, 늙은 부모가 자식들에게 재산을 나누는 장면이라 독립 등록 */
-v9ask('c_inheritance',1.2,P=>P.age>=55&&v7kids(P).length>=2&&v7nf(P),P=>{
+/* 발생 조건: 곁의 자녀 2명 이상. 단 몽골족 계승 후보(v52heir)가 곁에 있고 다른 자녀가 이미 독립해 있으면 곁의 자녀가 후보 1명뿐이어도 나온다. */
+const v9inhCond=P=>{
+  if(!(P.age>=55&&v7nf(P)))return false;
+  const n=v7kids(P).length;
+  if(n>=2)return true;
+  if(n!==1||typeof v52heir!=='function'||typeof v52ind!=='function')return false;
+  const h=v52heir(P);
+  return !!h&&v7kids(P)[0]===h&&P.kids.some(k=>k!==h&&k.alive&&v52ind(k));
+};
+v9ask('c_inheritance',1.2,v9inhCond,P=>{
   const st=V7CG(P)==='steppe';
   const o=[];
   const kids=()=>v7kids(P);
@@ -4729,7 +4742,12 @@ v9ask('c_inheritance',1.2,P=>P.age>=55&&v7kids(P).length>=2&&v7nf(P),P=>{
   if(P.female)o.push({t:'딸들에게 지참 재물을 넉넉히 마련해 준다',sub:'딸들과의 사이 +',fn:()=>{
     kids().forEach(k=>bd(k,k.female?8:-2));fx({wealth:-6});
     return v7RN('딸들에게 넉넉한 몫을 마련해 주었다. 딸들은 눈시울을 붉혔다.','m_inherit');}});
-  o.push({t:st?'관습대로 막내에게 화덕을 맡기고, 형들은 몫을 나눠 분가시킨다':'관습대로 맏이에게 집과 농지를 물려준다',fn:()=>{
+  const hr=st&&typeof v52heir==='function'?v52heir(P):null; /* 몽골족 가정의 실제 계승 후보(v52_children.js) */
+  const sonsOut=hr?P.kids.filter(k=>k.alive&&!k.female&&k!==hr&&typeof v52ind==='function'&&v52ind(k)).length:0;
+  const sonsIn=hr?P.kids.filter(k=>k.alive&&!k.female&&k!==hr&&!(typeof v52ind==='function'&&v52ind(k))&&!kidAway(k)).length:0;
+  const optT=hr?('관습대로 막내 '+hr.name+'에게 화덕을 맡기고'+(sonsIn?', 형들은 몫을 나눠 분가시킨다':(sonsOut?' 이미 따로 난 형들은 그대로 둔다':'')))
+               :(st?'관습대로 막내에게 화덕을 맡기고, 형들은 몫을 나눠 분가시킨다':'관습대로 맏이에게 집과 농지를 물려준다');
+  o.push({t:optT,fn:()=>{
     kids().forEach(k=>bd(k,ri(-4,4)));
     return v7RN('관습대로 몫을 나누었다. 이견이 있었으나 대체로 받아들여졌다.','m_inherit');}});
   o.push({t:'모든 자식에게 고르게 나눈다',sub:'자식들과의 사이 +',fn:()=>{
@@ -4739,7 +4757,7 @@ v9ask('c_inheritance',1.2,P=>P.age>=55&&v7kids(P).length>=2&&v7nf(P),P=>{
     const ks=kids();let best=ks[0];ks.forEach(k=>{if(v9kb(k)>v9kb(best))best=k;});
     ks.forEach(k=>bd(k,k===best?10:-6));
     return v7RN('{b}에게 가장 큰 몫을 주었다. 나머지 자식들 사이에서는 불편한 침묵이 흘렀다.','m_inherit',{b:best.name});}});
-  return v7sc('재산을 어찌 나눌까','나이가 들어 자식들에게 어떻게 재산을 물려줄지 생각해야 할 때가 왔다. 자식들의 눈빛이 하나둘 달라진다.',o,'노년');
+  return v7sc('재산을 어찌 나눌까','나이가 들어 자식들에게 어떻게 재산을 물려줄지 생각해야 할 때가 왔다.'+(hr?' 곁에는 막내 '+hr.name+'이(가) 남아 있다.'+(sonsOut?' 먼저 따로 난 아들들의 몫도 입에 오른다.':''):'')+' 자식들의 눈빛이 하나둘 달라진다.',o,'노년');
 },{cool:8});
 
 /* old_illness : 기존 '병이 들다'(illness)의 노년 판 */
@@ -6423,10 +6441,25 @@ v9ask('v12_master_conc',1.2,v12concOK,P=>{
    색에만 기대지 않도록 모든 표시에 아이콘과 짧은 글자(배지)를 함께 붙인다. */
 const V12KN={
   birth:['up','＋','탄생'],wed:['up','✓','혼인'],reunion:['up','✓','재회'],
-  death:['down','†','부고'],missing:['down','?','소식 끊김'],captive:['down','!','포로'],split:['down','!','이산']
+  death:['down','†','부고'],missing:['down','?','소식 끊김'],captive:['down','!','포로'],split:['down','!','이산'],
+  /* 인편·전언으로 들은 가족 소식(직접 만나지 못함): 손주 탄생·친정/고향 근황·행방 모르던 가족의 생존·시집간 딸/며느리 소식 */
+  grand:['up','＋','인편 소식'],news:['up','✉','인편 소식'],newsbad:['down','✉','인편 소식'],kinsman:['up','✉','친척 소식']
 };
+/* 인편으로 전해진 가족 소식 문장 판별(표시 전용). 일상 지문(옛이야기·국을 건넴 등)과 일반 소식(라마단 등)은 가족 지칭이 없어 제외된다 */
+const V12ROLE='(?:아버지|어머니|형|누나|오빠|언니|남동생|여동생|동생|남편|아내|딸|아들|부인|옛 아내)';
+function v12knNews(line){
+  if(!line||line.length>170)return null;
+  if(/손(?:자|녀)를 얻었으나 아직 얼굴은 보지 못했다/.test(line))return 'grand';
+  if(/오래 연락이 끊겼던 먼 친척을 만났다/.test(line))return 'kinsman';
+  if(/(?:종으로 일하며 살아 있다는|혼인을 강요당했다는|강제로 혼인당했다는)/.test(line)&&/(?:이야기|소문|소식)[을를] 들었다/.test(line))return 'newsbad';
+  if(new RegExp('^끌려간 '+V12ROLE+' \\S+.*소식을 들었다').test(line))return 'news';
+  if(/시집간 딸[^.]*(?:안부|손주 이야기)[^.]*전해|시집간 딸네 소식이 인편으로|며느리 \S+[이가] 친정 소식을 전해 듣고|고향에 새 식구가 태어났다고 한다/.test(line))return 'news';
+  if(/(?:별일 없이 지낸다|살아 있다|무사하다)고 한다/.test(line)&&(new RegExp(V12ROLE+' \\S+[이가]').test(line)||/소식을 전했다/.test(line)))return 'news';
+  return null;
+}
 /* 한 줄이 가족 소식이면 종류를, 아니면 null. strict: 이벤트 결과문 속 줄(구조화된 '가족명: 상태' 형식만 인정) */
 function v12kn(line,strict){
+  if(!strict){const kn=v12knNews(line);if(kn)return kn;}
   if(!line||line.length>110)return null;
   if(strict){
     if(!/^(옛 아내|배우자|부인|아내|남편|딸|아들|아버지|어머니|형|누나|오빠|언니|남동생|여동생|동생|손자|손녀|안다) \S+: /.test(line)&&!/^그 밖에도 \d+명의 소식이/.test(line))return null;
@@ -6479,6 +6512,8 @@ function v12kinTree(html){
    선택이 없는 짧은 카드로 바꿔 쌓는다. 선택지를 억지로 만들지 않고, '선택 · …' 줄 자리에 소식 종류를 보여 준다. */
 const V12KCARD={
   birth:['','집안에 새 식구가 늘었다.'],wed:['',''],
+  grand:[l=>/손녀를 얻었/.test(l)?'손녀를 얻다':'손자를 얻다',''],kinsman:['먼 친척의 소식',''],
+  news:[l=>v12newsTitle(l),''],newsbad:[l=>v12newsTitle(l),''],
   death:['가족의 부고',''],missing:['가족과 소식이 끊겼다',''],captive:['가족이 끌려갔다',''],split:['가족과 헤어졌다',''],reunion:['가족과 다시 만났다','']
 };
 /* 줄 속에 이름이 나온 가족을 찾는다: 같은 해 같은 소식이 다른 문장(결과문·기록)으로 두 번 나오는 것을 한 장으로 합치기 위함 */
@@ -6491,11 +6526,19 @@ function v12kinWho(line){
   const keep=hit.filter(n=>!hit.some(m=>m!==n&&m.indexOf(n)>=0));
   return keep.length?keep.sort().join('+'):null;
 }
+/* 소식 카드 제목: 누구에게서 온 소식인지에 맞춘다 */
+function v12newsTitle(l){
+  if(/시집간 딸/.test(l))return '시집간 딸의 소식';
+  if(/며느리/.test(l)&&/친정/.test(l))return '며느리의 친정 소식';
+  const natal=new RegExp('(?:^|[ .])(?:아버지|어머니|형|누나|오빠|언니|남동생|여동생|동생) \\S+[이가]').test(l)||/고향에 새 식구/.test(l);
+  if(natal)return (P&&P.female&&(P.spouse||(P.exSpouses||[]).length))?'친정에서 온 소식':'고향에서 온 소식';
+  return '먼 곳에서 전해진 소식';
+}
 function v12kinCard(k,line){
   const d=V12KN[k],c=V12KCARD[k];
   const parts=line.split(/(?<=[.!?])\s+/);
   let title,body;
-  if(c[0]){title=c[0];body=line;}
+  if(c[0]){title=typeof c[0]==='function'?c[0](line):c[0];body=line;}
   else{title=parts[0];body=parts.slice(1).join(' ')||c[1];}
   return {k:'event',title:title,pick:d[1]+' '+d[2],text:body,kin:d[0],chips:[]};
 }
@@ -8080,7 +8123,7 @@ kidWedScene=function(k){
   return s;
 };
 /* 재산을 어찌 나눌까(c_inheritance): 성인 자녀 중 사이가 가장 가까운 아이 또는 가장 먼 아이 한 명 */
-const rmAdults=()=>(P.kids||[]).filter(k=>k.alive&&k.age>=15&&k.bond!==undefined);
+const rmAdults=()=>(P.kids||[]).filter(k=>k.alive&&k.age>=15&&k.bond!==undefined&&!k.pend&&!k.apart&&!kidAway(k)&&!v47far(k)); /* 곁에서 지내는 자녀만: 독립·시집간·멀리 사는·팔린·소식 끊긴 자녀는 곁에 앉거나 간호하지 않는다 */
 rmWrapOpts(rmFindEv('c_inheritance'),null,{line:()=>{
   const a=rmAdults();if(!a.length)return '';
   const hi=a.reduce((x,y)=>y.bond>x.bond?y:x),lo=a.reduce((x,y)=>y.bond<x.bond?y:x);
@@ -9760,7 +9803,7 @@ function treeHTML0(){
     let inner='';
     if(k.inlaw)inner=`<ul><li>${k.female?'사위':'며느리'} ${esc(k.inlaw.name)} <span class="muted">(${esc(triLab(k.inlaw.tribe))} · ${esc(k.inlaw.desc)})</span>${gk?`<ul>${gk}</ul>`:''}</li></ul>`;
     else if(gk)inner=`<ul>${gk}</ul>`;
-    return `<li>${k.adoptive?(k.female?'양녀':'양자'):(k.female?'딸':'아들')} ${esc(k.name)} <span class="muted">(${k.age}세${k.adoptive&&k.adoptive.bio?' · 친부모 '+esc([k.adoptive.bio.father,k.adoptive.bio.mother].filter(Boolean).join('·')):''}${k.status==='slave'?' · 노예':(k.status==='free'?' · 자유민':'')}${k.father&&k.father.name?' · 아버지 '+esc(k.father.name):''}${k.father&&k.father.uncertain?' · 친부 불확실':''}${k.mother&&k.mother!==P.name?' · 어머니 '+esc(k.mother):''}${deadTag(k)}${k.alive&&k.apart==='left'?' · 고향에 남음 · 소식이 끊김':''}${k.alive&&k.warTogether?' · 함께 끌려옴':''}${k.recog?(k.recog.kind==='accepted'?' · 남편이 자녀로 맞음':(k.recog.kind==='cold'?' · 남편이 다르게 대함':' · 남편이 인정하지 않음')):''}${k.apart==='sold'?(k.reun&&k.reun.stage==='met'?' · 다시 만났으나 따로 지냄':' · 헤어져 지냄'):(k.away?' · 시댁 부족으로 떠남':(k.wed?' · 혼인':''))})</span>${inner}</li>`;
+    return `<li>${k.adoptive?(k.female?'양녀':'양자'):(k.female?'딸':'아들')} ${esc(k.name)} <span class="muted">(${k.age}세${k.adoptive&&k.adoptive.bio?' · 친부모 '+esc([k.adoptive.bio.father,k.adoptive.bio.mother].filter(Boolean).join('·')):''}${k.status==='slave'?' · 노예':(k.status==='free'?' · 자유민':'')}${typeof v52tag==='function'?esc(v52tag(k)):''}${k.father&&k.father.name?' · 아버지 '+esc(k.father.name):''}${k.father&&k.father.uncertain?' · 친부 불확실':''}${k.mother&&k.mother!==P.name?' · 어머니 '+esc(k.mother):''}${deadTag(k)}${k.alive&&k.apart==='left'?' · 고향에 남음 · 소식이 끊김':''}${k.alive&&k.warTogether?' · 함께 끌려옴':''}${k.recog?(k.recog.kind==='accepted'?' · 남편이 자녀로 맞음':(k.recog.kind==='cold'?' · 남편이 다르게 대함':' · 남편이 인정하지 않음')):''}${k.apart==='sold'?(k.reun&&k.reun.stage==='met'?' · 다시 만났으나 따로 지냄':' · 헤어져 지냄'):(k.away?' · 시댁 부족으로 떠남':(k.wed?' · 혼인':''))})</span>${inner}</li>`;
   }).join('');
   const gcount=P.kids.reduce((s,k)=>s+(k.kids||[]).length,0);
   const a=P.anda;
@@ -10261,6 +10304,17 @@ title();
    - 확인 여부: localStorage 'tengri_updlog_seen'(기존 저장 키와 별도)에 마지막으로 확인한 기록의 id를 저장한다.
      id 가 그보다 큰 기록이 있으면 NEW 를 보여 준다. 저장소를 못 쓰는 환경에서는 새로고침 전까지만 유지된다. */
 const UPDATE_LOG=[
+  {id:'2026/11/13',date:'2026/11/13',title:'11/13 업데이트',sections:[
+    {h:'새로운 콘텐츠',items:[
+      '자녀의 성장과 독립 이벤트 추가',
+      '멀리 떠난 가족의 근황을 인편으로 전해 듣는 소식 추가',
+      '계절 행사와 명절에 맞춘 일상 이벤트 추가',
+      '초원의 막내 계승 풍습(옷치긴) 반영',
+      '재산 상속 장면 개선',
+      '이름 추가',
+      '화면 및 텍스트 개선 및 오류 수정'
+    ]}
+  ]},
   {id:'2026/11/11',date:'2026/11/11',title:'11/11 업데이트',sections:[
     {h:'새로운 콘텐츠',items:[
       '새로운 직업 6종 관련 개선',
@@ -10525,7 +10579,7 @@ function v46due(P){
    2) 'd_with_children'의 '마당에서 뛰어노는 소리'·'아이의 열' 문장: 문장은 그대로 두고 곁에 어린 자녀(12세 이하)가 있을 때만 나오게 옮기고,
       장성한 자녀뿐일 때는 동네 아이들·이웃집 아이 이야기로, 곁에 어린 손주가 있을 때는 손주 이야기로 나오는 풀을 더한다.
    3) 며느리·새언니(형수·제수·올케) 일상 지문을 더한다. */
-const v47far=k=>!!k&&(wedOut(k)||!!k.away||!!k.lost||k.apart==='sold'||k.apart==='left'); /* 곁에서 지내지 않는 자녀 */
+const v47far=k=>!!k&&(wedOut(k)||!!k.away||!!k.lost||k.apart==='sold'||k.apart==='left'||(typeof v52far==='function'&&v52far(k))); /* 곁에서 지내지 않는 자녀 */
 const v47gks=(k,max)=>(k.kids||[]).some(g=>g&&g.alive&&(max===undefined||g.age<=max));
 function v47gkHome(P,max){return (P.kids||[]).some(k=>k&&k.alive&&!v47far(k)&&v47gks(k,max));} /* 곁에 사는 자녀의 손주 */
 const v47visit=P=>(P.kids||[]).some(k=>k&&k.alive&&k.female&&wedOut(k)&&!k.lost&&k.apart!=='sold'&&v47gks(k)); /* 시집간 딸의 손주 */
@@ -10568,7 +10622,7 @@ const v47hasKid=P=>(P.kids||[]).some(k=>k&&k.alive&&!v47far(k));
     '지나던 상인이 시집간 딸의 안부와 손주 이야기를 전해 주었다. 건강히 잘 지낸다는 말에 마음이 놓였다.']]);
 })();
 /* 3) 며느리·새언니 일상 지문 */
-const v47dil=P=>(P.kids||[]).filter(k=>k&&k.alive&&!k.female&&k.wed&&k.inlaw&&k.inlaw.alive!==false&&!k.inlaw.forced&&!v47far(k));
+const v47dil=P=>(P.kids||[]).filter(k=>k&&k.alive&&!k.female&&k.wed&&k.inlaw&&k.inlaw.alive!==false&&!k.inlaw.forced&&!v47far(k)&&!(typeof v52ind==='function'&&v52ind(k))); /* 따로 사는 아들 내외는 같은 집 지문에서 제외 */
 v9run('v47_daughter_in_law',0.9,P=>P.age>=36&&v7nf(P)&&v47dil(P).length>0,P=>{
   const k=R(v47dil(P)),n=k.inlaw.name;
   const L=[
@@ -11025,4 +11079,426 @@ function v51roll(P){
   const h=yearHook;
   yearHook=function(){const r=h.apply(this,arguments);try{v51roll(P);}catch(e){}return r;};
 }
+/* v51 축제와 지역 행사 (지문 21개 + 선택 장면 2개).
+   - 기존 GEN·V7EV·V7POOLS·v49 계절 이벤트의 확률·선택지 구조는 건드리지 않는다. v49 와 같은 방식으로 연초(yearHook) 뒤에 독립적으로 한 번 더 판정하고,
+     결과는 연간 계획(plan.items)에 끼워 넣어 소재의 계절 구간에 시각 t 를 다시 배정한다.
+   - 지역은 실제 P.pol / P.region 으로 가른다(v49 의 v49steppe·v49gHan·v49gJur·v49in 재사용). 몽골식 행사는 초원·몽골 가문(포로·노예·인질 출신 표기 제외)에만,
+     고려·금(한족/여진)·서하·호라즘·페르시아·루스·폴란드/헝가리·조지아는 각 지역의 생활 방식에 맞춰 따로 둔다.
+   - 대상: 자유 신분, 6세 이상, 생존, 해당 지역의 침공·점령 시기(v49war)가 아닐 때.
+   - 빈도: 해마다 지문 최대 1개(확률 .20), 직전 지문과 3년 이상 간격, 같은 지문 12년 쿨다운, 그 해 v49 계절 지문이 이미 있으면 양보. 장면은 확률 .06·3년 이상 간격·같은 장면 12년.
+   - 저장: P.flags.v51f({ls,ss}), P.cd['v51f_<id>'] 만 쓴다(없으면 이 모듈이 만들어 쓰므로 기존 저장본과 호환).
+   - 문장은 상황만 쓰고 플레이어의 감정은 정하지 않는다. 풍습은 널리 확인되는 수준까지만 일반화해 썼다. */
+const V51F_LINE_P=.20,V51F_GAP=3,V51F_CD=12,V51F_SCENE_P=.06,V51F_SGAP=3;
+const v51fNomad=P=>v49steppe(P)&&!/계 (포로|노예|인질)|투항자/.test(P.tribe||'');
+const v51fSlav=P=>P.pol==='rus'&&!v49in(P,['조지아','트빌리시','헝가리','폴란드']);
+const v51fEu=P=>P.pol==='rus'&&v49in(P,['헝가리','폴란드']);
+const v51fGeo=P=>P.pol==='rus'&&v49in(P,['조지아','트빌리시']);
+const v51fPer=P=>P.pol==='khw'||P.pol==='per';
+/* 계절: 0 봄 1 여름 2 가을 3 겨울 */
+const V51F_LINES=[
+ /* 몽골 초원·몽골 가문 */
+ {id:'sp_steppe_newyear',s:0,cond:P=>v51fNomad(P)&&P.age>=6,txt:P=>"새해를 맞아 천막마다 젖과 유제품으로 만든 음식을 내놓았다. 이웃과 친척이 오가며 한 해의 안부를 묻고 덕담을 나누었다."+(v49kidsSmall(P)?" 아이들은 어른들 사이를 오가며 얻어먹느라 바빴다.":"")},
+ {id:'sp_steppe_lambing',s:0,cond:P=>v51fNomad(P)&&P.age>=8,txt:P=>"새끼를 낳는 철이라 밤마다 천막 가까이에 암양과 암말을 들여 지켰다. 이웃끼리 서로의 가축을 봐 주러 오가는 일이 잦았다."},
+ {id:'su_steppe_kumis',s:1,cond:P=>v51fNomad(P)&&P.age>=6,txt:P=>"마유주가 익는 철이 되었다. 천막 어귀마다 마유주를 담은 가죽 부대가 걸려 있었고, 오가는 사람들이 막대로 한 번씩 저어 주었다."},
+ {id:'au_steppe_slaughter',s:2,cond:P=>v51fNomad(P)&&P.age>=10,txt:P=>"가을 풀에 살이 오른 가축 가운데 일부를 잡는 철이 되었다. 이웃들이 모여 일손을 보태고, 겨울을 날 고기는 길게 썰어 바람에 말렸다."},
+ /* 고려 */
+ {id:'sp_gory_samjin',s:0,cond:P=>P.pol==='goryeo'&&P.age>=6,txt:P=>"삼짇날이 되자 사람들이 들과 냇가로 나가 봄놀이를 했다. 겨우내 닫혀 있던 마을이 모처럼 한가로웠다."},
+ {id:'su_gory_ullambana',s:1,cond:P=>P.pol==='goryeo'&&P.age>=8,txt:P=>"칠월 보름, 절에서 조상을 위한 재가 열렸다. 마을 사람들이 쌀과 과일을 들고 모여 이름을 불러 가며 명복을 빌었다."},
+ {id:'au_gory_jungu',s:2,cond:P=>P.pol==='goryeo'&&P.age>=8,txt:P=>"중구에는 높은 곳에 올라 가을 산천을 내려다보는 이들이 있었다. 국화를 띄운 술을 돌려 마시며 한 해 농사 이야기가 오갔다."},
+ {id:'wi_gory_dongji',s:3,cond:P=>P.pol==='goryeo'&&P.age>=8,txt:P=>"동짓날, 밤이 가장 긴 날이라며 이웃끼리 안부를 나누었다. 이날을 지나면 해가 다시 길어진다고들 했다."},
+ /* 금: 한족 농경·도시 지역 / 여진 본향 */
+ {id:'sp_jin_lantern',s:0,cond:v49gHan,txt:P=>"정월 보름밤, 거리마다 등을 내걸어 한밤에도 환했다. 사람들이 등 구경을 하느라 골목을 늦도록 오갔다."},
+ {id:'su_jin_duanwu',s:1,cond:P=>v49gHan(P)&&P.age>=6,txt:P=>"단오라 집집마다 문에 쑥과 창포를 걸어 액을 막았다. 쫑즈를 쪄 이웃과 나누었고, 아이들 손목에는 오색실이 매여 있었다."},
+ {id:'su_jin_temple_fair',s:1,cond:P=>v49gHan(P)&&P.age>=10,txt:P=>"큰 절의 재일에 맞춰 절 앞에 장이 섰다. 향과 초, 부채와 먹거리를 파는 좌판이 길게 늘어서 참배객과 구경꾼이 뒤섞였다."},
+ {id:'au_jin_chongyang',s:2,cond:P=>v49gHan(P)&&P.age>=8,txt:P=>"중양절이라 높은 곳에 오르는 사람들이 많았다. 국화를 꽂고 국화주를 나누며 먼 곳의 가족 이야기를 하는 이도 있었다."},
+ {id:'sp_jur_firstfish',s:0,cond:P=>v49gJur(P)&&P.age>=8,txt:P=>"봄이 되어 강의 얼음이 갈라지자 마을 사람들이 강가에 모여 그물을 던졌다. 첫 고기를 잡은 날은 어른들이 모닥불 곁에 둘러앉아 나누어 먹었다."},
+ /* 서하 */
+ {id:'su_xia_caravan',s:1,cond:P=>P.pol==='xia'&&v49in(P,['허시','흥경'])&&P.age>=10,txt:P=>"오아시스 시장에 대상이 닿자 낙타 방울 소리가 울렸다. 차와 비단, 소금과 말이 오가며 하루 내내 장이 북적였다."},
+ {id:'au_xia_dharma',s:2,cond:P=>P.pol==='xia'&&P.age>=8,txt:P=>"큰 절에서 법회가 열린다는 소식에 사방에서 사람들이 모였다. 경 읽는 소리가 새벽까지 이어졌고, 절 밖에서는 음식을 나누어 주었다."},
+ /* 호라즘·페르시아 */
+ {id:'sp_per_nowruz',s:0,cond:P=>v51fPer(P)&&P.age>=6,txt:P=>"노루즈, 새해 첫날이 밝았다. 집집마다 묵은 먼지를 쓸어내고 새 옷을 꺼내 입었으며, 이웃을 찾아 인사와 선물을 주고받았다."},
+ {id:'wi_per_bath',s:3,cond:P=>v51fPer(P)&&P.age>=10,txt:P=>"한겨울 공중목욕탕은 김이 자욱했다. 목욕을 마친 이웃들이 한데 앉아 차를 나누며 장터 소식을 주고받았다."},
+ /* 루스·폴란드/헝가리·조지아 */
+ {id:'su_rus_games',s:1,cond:P=>v51fSlav(P)&&P.age>=10,txt:P=>"여름 저녁, 마을 젊은이들이 풀밭에 모여 원을 지어 노래하고 춤을 추었다. 사제들은 이런 놀이를 못마땅해했지만 모임은 늦도록 이어졌다."},
+ {id:'au_rus_market',s:2,cond:P=>v51fSlav(P)&&P.age>=10,txt:P=>"추수를 마친 장터에 곡식 가마와 모피, 꿀과 밀랍이 쌓였다. 먼 마을에서 온 상인들이 값을 흥정하느라 목소리를 높였다."},
+ {id:'su_eu_saint',s:1,cond:P=>v51fEu(P)&&P.age>=8,txt:P=>"수호성인의 축일이 되자 성당 앞 광장에 장이 서고 먼 마을에서 순례자들이 몰려들었다. 미사가 끝난 뒤에도 광장의 소란은 가라앉지 않았다."},
+ {id:'wi_geo_baths',s:3,cond:P=>v51fGeo(P)&&P.age>=10,txt:P=>"트빌리시의 뜨거운 샘물 위에 지은 목욕탕에는 겨울에도 사람이 끊이지 않았다. 목욕을 마친 이웃들이 모여 한참 수다를 이어 갔다."},
+];
+const V51F_SCENES=[
+ {id:'sc_fair',s:2,cd:V51F_CD,cond:P=>!v49steppe(P)&&P.age>=14&&['jin','xia','khw','per','rus','goryeo'].includes(P.pol),mk:P=>v7sc('큰 장날','철에 한 번 서는 큰 장날이 돌아왔다. 먼 마을 사람들까지 모여들어 장터가 평소의 몇 배로 북적인다.',[
+   {t:'가진 물건을 들고 나가 판다',sub:'값을 잘 받으면 이득이다',fn:()=>{if(Math.random()<.6){fx({wealth:3,wit:1});return '물건을 제값에 넘기고 필요한 것을 바꿔 돌아왔다. 장터의 시세도 귀담아들었다.';}fx({wealth:-1,wit:1});return '사람은 많았지만 값이 시원치 않았다. 헐값에 넘기고 돌아섰다.';}},
+   {t:'구경하며 필요한 것만 산다',fn:()=>{fx({wealth:-1,wit:1});return '장터를 한 바퀴 돌며 구경하다가 꼭 필요한 물건만 골라 샀다. 이곳저곳에서 오가는 소문도 들었다.';}},
+   {t:'식구들 먹거리와 작은 선물을 사 간다',sub:'재물 −, 집안 분위기 +',fn:()=>{fx({wealth:-2,hp:1});return '식구들 몫의 먹거리와 소소한 선물을 챙겨 돌아왔다. 그날 저녁 식탁이 평소보다 푸짐했다.';}}],'일상')},
+ {id:'sc_steppe_feast',s:2,cd:V51F_CD,cond:P=>v51fNomad(P)&&P.age>=14,mk:P=>v7sc('이웃의 잔치','이웃 천막에서 잔치가 열린다는 전갈이 왔다. 가까운 천막들이 모여 고기와 마유주를 나눌 것이라 한다.',[
+   {t:'선물을 챙겨 일찍 찾아간다',sub:'재물 −, 명성 +',fn:()=>{fx({wealth:-2,fame:2});return '치즈와 가죽 부대 하나를 들고 찾아갔다. 주인이 자리를 내주었고, 밤늦도록 이야기가 이어졌다.';}},
+   {t:'일을 마치고 잠시만 들른다',fn:()=>{fx({fame:1});return '해 질 무렵 들러 술잔을 한 번 받고 인사를 나눈 뒤 돌아왔다.';}},
+   {t:'노래나 이야기 한 자락을 청한다',sub:'솜씨를 보일 기회',fn:()=>{fx({fame:1,wit:2});return '불가에 둘러앉은 사람들 앞에서 노래 한 자락을 불렀다. 몇몇이 따라 흥얼거렸다.';}}],'일상')},
+];
+const v51fAll=()=>V51F_LINES.concat(V51F_SCENES);
+const v51fOk=(P,e)=>{try{return e.cond(P)&&!(P.cd&&P.cd['v51f_'+e.id]>P.year);}catch(x){return false;}};
+let V51Fcur=null;
+function v51fRoll(P){
+  V51Fcur=null;
+  if(!P||P.dead||P.status!=='free'||P.age<6||v49war(P))return;
+  P.cd=P.cd||{};P.flags=P.flags||{};
+  const st=P.flags.v51f=P.flags.v51f||{ls:-9,ss:-9};
+  const v49y=P.flags.v49&&P.flags.v49.ls===P.year; /* 그 해 v49 계절 지문이 있으면 양보 */
+  if(!v49y&&P.year-st.ls>=V51F_GAP&&Math.random()<V51F_LINE_P){
+    const c=V51F_LINES.filter(e=>v51fOk(P,e));
+    if(c.length){const e=c[Math.floor(Math.random()*c.length)];
+      P.cd['v51f_'+e.id]=P.year+V51F_CD;st.ls=P.year;
+      V51Fcur={line:{s:e.s,text:jf(e.txt(P))}};}
+  }
+  const v49s=P.flags.v49&&P.flags.v49.ss===P.year;
+  if(!v49s&&P.age>=14&&P.year-st.ss>=V51F_SGAP&&G.q.length<2&&Math.random()<V51F_SCENE_P){
+    const c=V51F_SCENES.filter(e=>v51fOk(P,e));
+    if(c.length){const e=c[Math.floor(Math.random()*c.length)];
+      const s=e.mk(P);
+      if(s){P.cd['v51f_'+e.id]=P.year+e.cd;st.ss=P.year;s.v51s=e.s;G.q.push(s);(V51Fcur=V51Fcur||{}).scene=s;}}
+  }
+}
+(function(){
+  const h=yearHook;
+  yearHook=function(){const r=h.apply(this,arguments);try{v51fRoll(P);}catch(e){V51Fcur=null;}return r;};
+  const bY=beginYear;
+  beginYear=function(){
+    V51Fcur=null;
+    const r=bY.apply(this,arguments);
+    try{
+      const c=V51Fcur;V51Fcur=null;
+      const pl=G.run&&G.run.plan;
+      if(c&&pl&&P&&!P.dead){
+        if(c.line){pl.items.push({t:v49T(c.line.s),type:'line',text:c.line.text,news:'',chips:[],v51f:1});}
+        if(c.scene){const it=pl.items.find(x=>x.scene===c.scene);if(it)it.t=v49T(c.scene.v51s);}
+        pl.items.sort((a,b)=>a.t-b.t);
+      }
+    }catch(e){}
+    return r;
+  };
+})();
+/* v52 자녀의 성장과 독립.
+   - 가족 자료 구조(P.kids 의 필드)는 늘리지 않는다. 독립 상태는 P.flags.v52 에만 둔다(자녀 키 = 이름|출생연도|성별).
+     부모·자녀 관계(P.kids)는 그대로이며, '따로 사는가'는 그 관계와 별도로 기록한다.
+   - 기존 코드에 닿는 곳: kidAway·v7kids(v7.js: 곁에 없는 자녀에 독립 자녀 포함), v47far(v47_kinlogs.js: 먼 곳 자녀의 손주 소식을 인편으로), 가계도 표시(ui.js: 독립 표시).
+   - 독립한 자녀의 혼인·출산·사망은 기존 family() 가 그대로 처리한다(미혼 독립 자녀의 혼인만 이 모듈이 makeInlaw 로 처리: 부모가 짝을 고르는 장면이 어울리지 않기 때문).
+   - 성장 지문·독립·근황은 카드(plan type:'card')로 낸다. kin 이 지정된 카드라 v12 의 문장 분류기를 다시 타지 않는다.
+   - 발생: 해마다 성장 카드 ≤1, 독립 ≤1(직전 독립과 1년 이상 간격), 독립 후 근황 카드 ≤1(독립 2년 이상 경과, 자녀별 3년 간격).
+     자녀마다 성향(이름 해시)이 정해져 있어 모든 자녀가 독립하는 것은 아니다.
+   - 저장: P.flags.v52 = {ind:{키:{y,form,far,job,jy,n}}, done:{}, gy, iy, ny, ky:{}, noc:{}}. 없으면 새로 만든다(구 저장본 호환).
+   - 문장은 상황만 쓰고 플레이어의 감정이나 선택을 정하지 않는다. */
+const V52_GROW_P=.25,V52_IND_GAP=1,V52_NEWS_GAP=3,V52_NEWS_AFTER=2,V52_JOB_GAP=4;
+const v52key=k=>k.name+'|'+(P.year-k.age)+(k.female?'f':'m');
+const v52h=s=>{let h=7;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return h%100;};
+const v52st=()=>{P.flags=P.flags||{};return P.flags.v52=P.flags.v52||{ind:{},done:{},gy:-9,iy:-9,ny:-9,ky:{},noc:{}};};
+const v52rec=k=>{const f=typeof P!=='undefined'&&P&&P.flags&&P.flags.v52;return f&&f.ind&&k?f.ind[v52key(k)]||null:null;};
+const v52ind=k=>!!v52rec(k);                              /* 따로 사는 자녀 (가족 관계는 그대로) */
+const v52far=k=>{const r=v52rec(k);return !!r&&!!r.far;}; /* 다른 고장에서 지내는 자녀 */
+const v52tag=k=>{const r=v52rec(k);if(!r)return (typeof P!=='undefined'&&P&&k&&v52heir(P)===k)?' · 부모의 천막을 이을 막내':'';return {married_home:' · 따로 살림',work:' · 타지에서 생업',kin:' · 친척 곁',consent:' · 따로 살림'}[r.form]||' · 따로 지냄';};
+const v52kw=k=>k.adoptive?(k.female?'양녀':'양자'):(k.female?'딸':'아들');
+/* 옷치긴(막내아들이 부모 곁에 남음) 후보.
+   - 적용: 유목 지역이며 가장(남편, 없으면 본인)의 부족이 '몽골족'일 때만. 타타르·케레이트·나이만·메르키트·옹기라트·오이라트 등은 이 풍습의 근거를 확인하지 못해 제외한다.
+   - 후보: 곁에 있는 친아들 중 가장 어린 아들(생존·소식 있음·팔리거나 떠나지 않음·노예 아님·이미 독립하지 않음). 입양 자녀는 후보에서 뺀다(입양 막내의 계승 여부는 근거 불확실).
+   - 영구 고정하지 않고 판정 시점의 가족 구성으로 매번 계산한다(막내 사망·실종 → 다음 아들, 더 어린 아들이 태어나면 그 아이). */
+const v52headTribe=P=>tribeBase((P.female&&P.spouse&&P.spouse.tribe)?P.spouse.tribe:P.tribe);
+const v52otc=P=>v52gc(P)==='n'&&v52headTribe(P)==='몽골족';
+function v52heir(P){
+  if(!P||!P.kids||!v52otc(P))return null;
+  let h=null;
+  P.kids.forEach(k=>{if(k&&k.alive&&!k.female&&!k.adoptive&&!k.pend&&!k.lost&&!k.apart&&!k.away&&k.status!=='slave'&&!v52ind(k)&&(!h||k.age<=h.age))h=k;});
+  return h;
+}
+/* 플레이어 본인이 옷치긴(막내) 후보인가 — 아버지의 집안 쪽에서 본 판정. 상속 서술(inheritHerd·inheritScene)이 쓴다.
+   - 남성 플레이어, 유목 지역, 본인 부족이 '몽골족'(포로·투항 표기 제외는 v52gc 가 처리).
+   - 입양된 경우(P.flags.adoptedBy, P.adopt)는 제외(입양 계승은 근거 불확실).
+   - 곁에 소식이 닿는 더 어린 친남동생(older:false, half:false, 남성)이 살아 있으면 후보가 아님. 이복 동생은 판단하지 않는다. */
+function v52selfHeir(P){
+  if(!P||P.female||v52gc(P)!=='n'||tribeBase(P.tribe)!=='몽골족')return false;
+  if(P.flags&&P.flags.adoptedBy)return false;
+  if(P.adopt)return false;
+  return !(P.sibs||[]).some(s=>s&&s.alive&&!s.female&&!s.older&&!s.half&&!s.lost&&!s.away&&!s.hidden&&!s.apart&&!s.adoptive);
+}
+/* 지역 구분: v51 의 판정 재사용 */
+const v52reg=P=>v51fNomad(P)?'nomad':P.pol==='goryeo'?'gory':P.pol==='xia'?'xia':v51fPer(P)?'per':v51fSlav(P)?'slav':v51fEu(P)?'eu':v51fGeo(P)?'geo':v49gJur(P)?'jur':v49gHan(P)?'han':'other';
+const v52gc=P=>v52reg(P)==='nomad'?'n':'f';               /* n 유목 / f 정주 */
+const V52JOBS={
+ nomad:['다른 천막의 가축을 맡아 돌보는 목자 일을 하게 되었다','천호의 군역에 올라 군막에 속하게 되었다','말을 길들이고 마구를 다루는 일을 시작했다'],
+ gory:['읍내 장인 밑에서 일을 배우기 시작했다','장터에서 거간 일을 거들며 먹고살게 되었다','절에 들어가 일을 거들며 지내게 되었다'],
+ han:['성안 가게에서 일을 배우기 시작했다','대장간에서 풀무를 잡게 되었다','대상을 따라 짐을 나르는 일을 하게 되었다'],
+ jur:['성안 장인 밑에서 일을 배우기 시작했다','사냥과 어로를 하는 이웃 마을에 일손으로 들어갔다','군역에 올라 병영에 속하게 되었다'],
+ xia:['오아시스 시장의 상인 밑에서 일을 배우기 시작했다','대상을 따라 짐을 나르는 일을 하게 되었다','절의 일을 거들며 지내게 되었다'],
+ per:['시장의 상인 밑에서 일을 배우기 시작했다','공방에서 일을 배우기 시작했다','대상을 따라 짐을 나르는 일을 하게 되었다'],
+ slav:['도시 장터의 상인 밑에서 일을 배우기 시작했다','목수 일을 배우기 시작했다','강을 오가는 배의 일손으로 들어갔다'],
+ eu:['도시의 수공업자 밑에서 일을 배우기 시작했다','장터의 상인 밑에서 일을 배우기 시작했다','큰 영주의 일손으로 들어갔다'],
+ geo:['도시 장인 밑에서 일을 배우기 시작했다','장터의 상인 밑에서 일을 배우기 시작했다','대상을 따라 짐을 나르는 일을 하게 되었다'],
+ other:['도시의 가게에서 일을 배우기 시작했다','장인 밑에서 일을 배우기 시작했다','대상을 따라 짐을 나르는 일을 하게 되었다']
+};
+const v52jobs=P=>V52JOBS[v52reg(P)]||V52JOBS.other;
+const v52pick=a=>a[Math.floor(Math.random()*a.length)];
+/* ── 성장 지문 ──
+   st: h 일손(6~9) r 역할(10~13) t 청소년(14~17) a 성인(18~30) m 혼인 준비(미혼 16~24) f 혼인 후 부모 곁(혼인한 아들 18~40) w 다른 삶을 바람(미혼 17~26) */
+const V52GROW=[
+ {id:'n_h_m',st:'h',g:'n',sex:'m',txt:k=>`${k.name}이(가) 어린 양과 염소를 천막 가까운 풀밭으로 몰고 나가는 일을 맡기 시작했다.`},
+ {id:'n_h_f',st:'h',g:'n',sex:'f',txt:k=>`${k.name}이(가) 어머니 곁에서 젖을 짜고 가죽 부대를 젓는 일을 거들기 시작했다.`},
+ {id:'n_r_m',st:'r',g:'n',sex:'m',txt:k=>`${k.name}이(가) 말 타는 법을 제대로 익히고, 어른들을 따라 말 떼를 지키러 나가는 날이 늘었다.`},
+ {id:'n_r_f',st:'r',g:'n',sex:'f',txt:k=>`${k.name}이(가) 펠트와 끈 만드는 일을 배우며 어린 동생들을 돌보는 몫이 늘었다.`},
+ {id:'n_t_m',st:'t',g:'n',sex:'m',txt:k=>`${k.name}이(가) 활을 쥐고 몰이사냥에 어른들과 함께 나서기 시작했다. 가축 무리를 혼자 지키는 날도 생겼다.`},
+ {id:'n_t_f',st:'t',g:'n',sex:'f',txt:k=>`${k.name}이(가) 천막 살림의 큰 부분을 어머니와 나누어 맡게 되었다. 이웃 천막에서 혼담 이야기가 슬슬 오갔다.`},
+ {id:'n_a_m',st:'a',g:'n',sex:'m',txt:k=>`${k.name}이(가) 제 몫의 가축을 돌보며 어른 몫의 일을 하게 되었다.`},
+ {id:'n_a_f',st:'a',g:'n',sex:'f',txt:k=>`${k.name}이(가) 천막 안팎의 일을 어른 몫으로 맡아 해내게 되었다.`},
+ {id:'f_h_m',st:'h',g:'f',sex:'m',txt:k=>`${k.name}이(가) 새를 쫓고 가축에게 꼴을 먹이는 일로 부모의 일손을 돕기 시작했다.`},
+ {id:'f_h_f',st:'h',g:'f',sex:'f',txt:k=>`${k.name}이(가) 물을 긷고 불을 지피는 일로 어머니를 돕기 시작했다.`},
+ {id:'f_r_m',st:'r',g:'f',sex:'m',txt:k=>`${k.name}이(가) 아버지를 따라 밭이나 일터에 나가 허드렛일을 맡기 시작했다.`},
+ {id:'f_r_f',st:'r',g:'f',sex:'f',txt:k=>`${k.name}이(가) 길쌈과 바느질을 배우며 집안일의 몫이 늘었다.`},
+ {id:'f_t_m',st:'t',g:'f',sex:'m',txt:k=>`${k.name}이(가) 어른 몫의 일손으로 쳐지기 시작했다. 장터 심부름이나 먼 밭일도 혼자 다녀오게 되었다.`},
+ {id:'f_t_f',st:'t',g:'f',sex:'f',txt:k=>`${k.name}이(가) 집안 살림의 큰 부분을 어머니와 나누어 맡게 되었다. 이웃에서 혼담 이야기가 오가기 시작했다.`},
+ {id:'f_a_m',st:'a',g:'f',sex:'m',txt:k=>`${k.name}이(가) 어른 몫의 생업을 갖게 되었다. 집안의 일터와 장터를 오가며 제 몫을 해냈다.`},
+ {id:'f_a_f',st:'a',g:'f',sex:'f',txt:k=>`${k.name}이(가) 집안의 길쌈과 장터 일을 어른 몫으로 맡아 하게 되었다.`},
+ {id:'n_m',st:'m',g:'n',txt:k=>`${k.name}의 혼담이 슬슬 오갔다. 짝이 될 만한 집안을 헤아려 보는 이야기가 천막 사이에 돌았다.`},
+ {id:'f_m',st:'m',g:'f',txt:k=>`${k.name}의 혼인을 두고 이웃과 친척 사이에서 말이 오갔다. 혼수와 집안 형편을 헤아리는 이야기가 나왔다.`},
+ {id:'n_f',st:'f',g:'n',txt:k=>`${k.name}은(는) 혼인한 뒤에도 부모 곁의 천막에서 지내며 ${k.inlaw?k.inlaw.name+'과(와) 함께 ':''}가축 일을 나누어 맡았다.`},
+ {id:'f_f',st:'f',g:'f',txt:k=>`${k.name}은(는) 혼인한 뒤에도 부모의 집에서 지내며 ${k.inlaw?k.inlaw.name+'과(와) 함께 ':''}집안일과 생업을 나누어 맡았다.`},
+ {id:'n_o',st:'o',g:'n',txt:(k,P)=>{const sib=P.kids.some(x=>x!==k&&x.alive&&!x.female&&v52ind(x));
+   return k.wed?`${k.name}은(는) 막내로서 ${k.inlaw?k.inlaw.name+'과(와) 함께 ':''}부모 곁에 남아 천막과 살림을 이어 갈 사람으로 여겨졌다.${sib?' 먼저 따로 난 형들과 달리 부모의 화덕 곁이 그의 자리였다.':''}`
+              :`${k.name}은(는) 막내로서 부모 곁에 남아 천막과 살림을 이어 갈 사람으로 여겨졌다.${sib?' 먼저 따로 난 형들과 달리 부모의 화덕 곁이 그의 자리였다.':''}`;}},
+ {id:'n_w_m',st:'w',g:'n',sex:'m',txt:k=>`${k.name}이(가) 집안의 가축에만 매이지 않고 다른 길을 알아보고 싶다는 뜻을 비쳤다.`},
+ {id:'f_w_m',st:'w',g:'f',sex:'m',txt:k=>`${k.name}이(가) 집안일 말고 다른 생업을 알아보고 싶다는 뜻을 비쳤다.`},
+ {id:'w_f',st:'w',g:'*',sex:'f',txt:k=>`${k.name}이(가) 혼인 전에 가까운 어른 곁으로 옮겨 지내는 일을 이야기했다.`}
+];
+const V52RANGE={o:[15,40],h:[6,9],r:[10,13],t:[14,17],a:[18,30],m:[16,24],f:[18,40],w:[17,26]};
+const V52STAGE_TITLE={h:'일손을 돕는 아이',r:'맡는 일이 늘다',t:'청소년기의 책임',a:'생업을 갖다',m:'혼인을 헤아리다',f:'부모 곁의 살림',w:'다른 삶을 바라다',o:'막내의 자리'};
+/* 곁에서 자라는 자녀(성장 지문 대상) */
+const v52athome=(P,k)=>!!k&&k.alive&&!k.pend&&!k.lost&&!k.apart&&!k.away&&k.status!=='slave'&&!(k.wed&&k.female)&&!v52ind(k);
+function v52growPick(P,st){
+  const out=[];const heir=v52heir(P);
+  P.kids.forEach(k=>{
+    if(!v52athome(P,k))return;
+    const key=v52key(k);
+    Object.keys(V52RANGE).forEach(s=>{
+      const r=V52RANGE[s];if(k.age<r[0]||k.age>r[1])return;
+      if(s==='f'&&(!(k.wed&&!k.female)||k===heir))return;       /* 옷치긴 후보에게는 '막내의 자리' 지문이 대신한다 */
+      if(s==='o'&&k!==heir)return;
+      if((s==='m'||s==='w'||s==='a')&&k.wed)return;
+      if(s==='m'&&k.sched)return;
+      if(s==='w'&&(v52h(key)<40||k===heir))return;        /* 모든 자녀가 다른 삶을 바라는 것은 아니다. 옷치긴 후보는 제외 */
+      if(st.done[key+':'+s])return;
+      const e=V52GROW.find(e=>e.st===s&&(e.g==='*'||e.g===v52gc(P))&&(!e.sex||e.sex===(k.female?'f':'m')));
+      if(e)out.push({k,e,s,key});
+    });
+  });
+  return out;
+}
+/* ── 독립 ── */
+function v52makeInd(P,k,st,form,far,job){
+  const key=v52key(k);
+  st.ind[key]={y:P.year,form:form,far:!!far,job:job||'',jy:P.year,n:P.year};
+  st.iy=P.year;st.ky[key]=P.year;
+}
+function v52indCard(P,k,form,far,job){
+  const g=v52gc(P);let title,text;
+  if(form==='married_home'){
+    title=`${k.name}의 분가`;
+    text=g==='n'?`${k.name}이(가) 혼인한 살림을 따로 꾸렸다. 몫으로 받은 가축을 몰아 부모 천막 가까이에 제 천막을 세웠다.`
+               :`${k.name}이(가) ${k.inlaw?k.inlaw.name+'과(와) ':''}살림을 따로 났다. 가까운 곳에 집을 얻어 한 가정을 이루었다.`;
+  }else if(form==='work'){
+    title=`${k.name}이(가) 생업을 찾아 떠남`;
+    text=`${k.name}이(가) ${k.wed&&k.inlaw?k.inlaw.name+'과(와) 함께 ':''}집을 떠나 다른 고장으로 갔다. 그곳에서 ${job}. 소식은 인편으로 이따금 닿을 것이다.`;
+  }else if(form==='kin'){
+    title=`${k.name}이(가) 친척 곁으로`;
+    text=`${k.name}이(가) 친척의 집으로 옮겨 가 그곳에서 지내게 되었다. 집안 형편을 헤아려 어른들끼리 이야기를 맞춘 일이었다.`;
+  }else{
+    title=`${k.name}의 독립`;
+    text=`${k.name}이(가) 집안의 합의를 거쳐 따로 살림을 꾸리기로 했다. 부모 곁을 떠나 제 몫의 생활을 시작한다.`;
+  }
+  return {title,text,pick:far?'✉ 인편 소식':'▪ 자녀의 독립',kin:far?'up':'name'};
+}
+function v52independence(P,st,cur){
+  if(P.year-st.iy<V52_IND_GAP||v49war(P))return;
+  const g=v52gc(P);
+  const cands=[];
+  const sons=P.kids.filter(k=>k.alive&&!k.female);
+  const heir=v52heir(P);                                  /* 옷치긴 후보: 어떤 독립 형태로도 떠나지 않는다 */
+  const livingHome=P.kids.filter(k=>k.alive&&!v52ind(k)&&!k.apart&&!k.lost).length;
+  const widow=!(P.spouse&&P.spouse.alive)&&!(P.cowives||[]).some(w=>w.alive);
+  P.kids.forEach(k=>{
+    if(!v52athome(P,k)||k===heir)return;
+    const key=v52key(k),h=v52h(key);
+    if(st.ky[key]&&P.year-st.ky[key]<2)return;
+    if(k.wed&&!k.female&&k.age>=18){                      /* 혼인한 아들: 따로 살림 */
+      if(h<25)return;                                     /* 끝내 부모 곁에 남는 자녀 */
+      if(Math.random()<(g==='n'?.30:.18)){
+        if(Math.random()<(g==='n'?.12:.30))cands.push({k,form:'work',far:true,job:v52pick(v52jobs(P))}); /* 부부가 함께 생업을 찾아 다른 고장으로 */
+        else cands.push({k,form:'married_home',far:false});}
+      return;
+    }
+    if(k.wed)return;
+    if(!k.female&&k.age>=18&&k.age<=28&&h>=45){           /* 생업을 찾아 다른 고장으로 */
+      let p=(P.rank<=2||(P.wealth||0)<0)?.12:.07;
+      if(sons.filter(x=>x.alive&&!v52ind(x)).length<=1&&P.age>=55)p*=.3; /* 부모를 모실 아들이 하나뿐이면 드물다 */
+      if(Math.random()<p)cands.push({k,form:'work',far:true,job:v52pick(v52jobs(P))});
+    }
+    if(k.age>=14&&k.age<=24&&h>=50&&(livingHome>=4||widow||(P.wealth||0)<-10)&&Math.random()<.06)
+      cands.push({k,form:'kin',far:Math.random()<.5});    /* 집안 형편에 따라 친척 곁으로 */
+  });
+  if(!cands.length)return;
+  const c=cands[Math.floor(Math.random()*cands.length)];
+  v52makeInd(P,c.k,st,c.form,c.far,c.job);
+  cur.cards.push({s:Math.floor(Math.random()*4),card:v52indCard(P,c.k,c.form,c.far,c.job)});
+}
+/* 부모의 허락(선택 장면): '다른 삶을 바란다'는 지문을 받은 미혼 자녀 */
+function v52consent(P,st,cur){
+  if(P.year-st.iy<V52_IND_GAP||G.q.length>=2||v49war(P))return;
+  const heir=v52heir(P);
+  const cand=P.kids.filter(k=>{
+    const key=v52key(k);
+    return k!==heir&&v52athome(P,k)&&!k.wed&&st.done[key+':w']&&!st.ind[key]&&(!st.ky[key]||P.year-st.ky[key]>=2)&&!(st.noc[key]>P.year)&&k.age>=17&&k.age<=28;
+  });
+  if(!cand.length||Math.random()>.35)return;
+  const k=cand[Math.floor(Math.random()*cand.length)];const key=v52key(k);
+  const s=v7sc('독립 이야기',`${k.name}이(가) 다시 따로 살고 싶다는 이야기를 꺼냈다. ${k.female?'가까운 어른 곁에서 지내며 제 몫의 생활을 해 보겠다는 것':'집을 나가 제 힘으로 살림을 꾸려 보겠다는 것'}이었다. 집안에서는 형편과 일손을 헤아려 뜻을 맞추어야 한다.`,[
+    {t:'허락하고 필요한 몫을 챙겨 준다',sub:'재물 −',fn:()=>{
+      if(!v52athome(P,k)||st.ind[key]||k===v52heir(P))return `${k.name}의 이야기는 더 진행되지 않았다.`;
+      const form=k.female?'kin':'consent';
+      v52makeInd(P,k,st,form,form==='kin'&&Math.random()<.5);
+      fx({wealth:-2});
+      return `${k.name}의 뜻을 받아들였다. 세간과 몫을 챙겨 주고 새 생활을 시작하도록 했다.`;}},
+    {t:'몇 해 더 같이 지내며 보자고 한다',fn:()=>{st.noc[key]=P.year+3;return '몇 해 더 함께 지내며 형편을 보기로 했다.';}},
+    {t:'지금은 허락하지 않는다',fn:()=>{st.noc[key]=P.year+6;return '당분간 집에 있도록 하고 이야기를 접었다.';}}
+  ]);
+  if(s){s.v52s=Math.floor(Math.random()*4);G.q.push(s);cur.scene=s;}
+}
+/* ── 독립한 자녀의 소식 ── */
+function v52news(P,st,cur){
+  if(P.year-st.ny<1)return;
+  const pool=[];
+  P.kids.forEach(k=>{
+    const key=v52key(k),r=st.ind[key];
+    if(!r||!k.alive||k.pend||k.lost||k.apart)return;
+    if(P.year-r.y<V52_NEWS_AFTER)return;                  /* 독립 직후에는 같은 종류의 소식이 반복되지 않게 */
+    if(st.ky[key]===P.year)return;                        /* 자녀당 같은 해 한 장 */
+    if(P.year-r.n<V52_NEWS_GAP)return;
+    pool.push({k,r,key});
+  });
+  if(!pool.length||Math.random()>.22)return;
+  const {k,r,key}=pool[Math.floor(Math.random()*pool.length)];
+  if(!r.far&&Math.random()<.4)return;                    /* 가까이 사는 자녀의 방문은 더 드물게 */
+  const gk=(k.kids||[]).filter(a=>a.alive);
+  const spouse=k.wed&&k.inlaw?k.inlaw.name:null;
+  let d;
+  const done=()=>{r.n=P.year;st.ky[key]=P.year;st.ny=P.year;cur.cards.push({s:Math.floor(Math.random()*4),card:d});};
+  if(!k.wed&&k.age>=19&&k.age<=32&&Math.random()<.45){    /* 미혼 → 혼인 */
+    const inlaw=makeInlaw(k,Math.random()<.5?'same':'free');
+    k.wed=true;k.sched=1;k.inlaw=inlaw;
+    if(k.female&&isMg(P)&&tribeBase(inlaw.tribe)!==tribeBase(P.tribe))k.away=true;
+    d=r.far?{title:`${k.name}의 혼인 소식`,pick:'✉ 인편 소식',kin:'up',text:`${k.name}이(가) ${triLab(inlaw.tribe)}의 ${inlaw.name}(${inlaw.desc})과(와) 혼인했다는 소식이 인편으로 닿았다. 혼례에는 가지 못했다.`}
+            :{title:`${k.name}의 혼인`,pick:'▪ 자녀 소식',kin:'name',text:`${k.name}이(가) ${triLab(inlaw.tribe)}의 ${inlaw.name}(${inlaw.desc})과(와) 혼인했다. 혼례에는 가까운 이들이 모여 음식을 나누었다.`};
+    return done();
+  }
+  if(r.form==='work'&&P.year-r.jy>=V52_JOB_GAP&&Math.random()<.4){ /* 생업 변화(먼 곳) */
+    const nj=v52pick(v52jobs(P).filter(j=>j!==r.job));
+    r.job=nj;r.jy=P.year;
+    d={title:`${k.name}의 생업 소식`,pick:'✉ 인편 소식',kin:'up',text:`${k.name}의 소식이 인편으로 닿았다. 이제 ${nj}.`};
+    return done();
+  }
+  const pv=(a)=>{let i=Math.floor(Math.random()*a.length);if(a.length>1&&i===r.lv)i=(i+1)%a.length;r.lv=i;return a[i];};
+  if(r.far){                                              /* 먼 곳의 근황: 인편 */
+    const bits=[];
+    if(spouse)bits.push(`${spouse}과(와) 지낸다`);
+    if(gk.length)bits.push(`손주도 ${gk.length}명 두었다`);
+    const tail=bits.length?` ${bits.join(', ')}고 한다.`:'';
+    const body=r.form==='work'?pv(['타지에서 생업을 이어 가고 있다고 한다.','낯선 고장에서도 제 몫의 일을 하며 지낸다고 한다.','오가는 사람 편에 안부를 전해 왔다. 그곳 생활에 자리가 잡혀 간다고 한다.'])
+                              :pv(['친척 곁에서 지낸다고 한다.','친척 집의 일을 거들며 지낸다고 한다.']);
+    d={title:`${k.name}의 근황`,pick:'✉ 인편 소식',kin:'up',text:`${k.name}의 근황이 인편으로 전해졌다. ${body}${tail}`};
+  }else{                                                  /* 가까이 사는 자녀: 직접 만남 */
+    const who=spouse?`${spouse}과(와) 함께 `:'';
+    const body=pv(['따로 사는 살림 이야기를 나누었다.','철이 바뀌어 안부를 전하러 들렀다. 바깥일과 살림 이야기를 나누었다.','일이 한가한 틈을 내어 찾아왔다. 함께 음식을 나누고 돌아갔다.']);
+    d={title:`${k.name}의 방문`,pick:'▪ 자녀 소식',kin:'name',text:`${k.name}이(가) ${who}부모를 찾아왔다. ${body}${gk.length?' 손주도 데려와 한동안 집이 북적였다.':''}`};
+  }
+  done();
+}
+/* ── 해마다 판정 ── */
+let V52cur=null;
+function v52roll(P){
+  V52cur=null;
+  if(!P||P.dead||P.status!=='free'||!P.kids||!P.kids.length)return;
+  const st=v52st();
+  st.noc=st.noc||{};st.ky=st.ky||{};st.done=st.done||{};st.ind=st.ind||{};
+  const cur={cards:[],scene:null};
+  if(P.year-st.gy>=1){                        /* 성장 지문: 해마다 ≤1 */
+    const c=v52growPick(P,st);
+    if(c.length&&Math.random()<V52_GROW_P){
+      const x=c[Math.floor(Math.random()*c.length)];
+      st.done[x.key+':'+x.s]=1;st.gy=P.year;
+      cur.cards.push({s:Math.floor(Math.random()*4),card:{title:V52STAGE_TITLE[x.s],pick:'▪ '+v52kw(x.k)+' 소식',kin:'name',text:x.e.txt(x.k,P)}});
+    }
+  }
+  v52independence(P,st,cur);
+  v52consent(P,st,cur);
+  v52news(P,st,cur);
+  V52cur=cur;
+}
+(function(){
+  const h=yearHook;
+  yearHook=function(){const r=h.apply(this,arguments);try{v52roll(P);}catch(e){V52cur=null;}return r;};
+  const bY=beginYear;
+  beginYear=function(){
+    V52cur=null;
+    const r=bY.apply(this,arguments);
+    try{
+      const c=V52cur;V52cur=null;
+      const pl=G.run&&G.run.plan;
+      if(c&&pl&&P&&!P.dead){
+        c.cards.forEach(x=>{
+          const t=v49T(x.s);
+          const card=Object.assign({k:'event',chips:[],v52:1},x.card,{text:jf(x.card.text),title:jf(x.card.title),season:seasonOf(t)});
+          pl.items.push({t,type:'card',card,v52:1});
+        });
+        if(c.scene){const it=pl.items.find(x=>x.scene===c.scene);if(it)it.t=v49T(c.scene.v52s);}
+        pl.items.sort((a,b)=>a.t-b.t);
+      }
+    }catch(e){}
+    return r;
+  };
+})();
+/* v53 이름 풀 확장 — 반복되는 이름을 줄이려고 문화권별 이름을 더한다.
+   - 기존 풀(NM)에 이름만 덧붙인다. nameFor 의 중복 회피·덜 쓰인 이름 우선 규칙은 그대로다.
+   - 이미 풀에 있는 이름, 역사 인물 차단 목록(NAME_BLOCK), 가문 한정 이름(NAME_KIN)과 겹치는 이름은 넣지 않는다.
+   - 이 시대(12~13세기) 사건·역사 데이터에 나오는 인물의 이름은 고르지 않았다. */
+(function(){
+  const ADD={
+    mo:{
+      m:['아마르','바트후','간후','다르항','벅터','부렌','나차크','나샨','노로브','다바','다왕','도르','라쉬','마랄','바담','바이르','사항','세르','아주르','어치르','오드게렐','우제','잠양','제브','지르갈','처르','체데브','촐몬','투그스','항가이','허를로','후렐','엥크바트','투르','올자','수르','브렝','고치','우르진','바르가','체첸','보오그','타르','바이라','아디야','자미얀','돈도그','마그나이','사르굴','셍게','아르슬','볼로드','다리마','암갈','소드놈','나란','노로','투멘바트','오치바트','바야스','겔렝','이데르','자르갈란트'],
+      f:['볼로르','불강','투무르','오트','게렐','나르','노르','돌마','두를','마랄','먼흐','문흐','바르마','사이날','수미','숨야','아리','앙가','에르데','우잉','치메그','체체린','난드마','바이아르','오유나','사랑게렐','엥흐마','자르갈마','타미르','오드게렐','솔롱가','보얀','다르마','체첵마','나르마','알탄투야','소욜마','투멘체첵','우르트','하르가','바트체첵','지르갈마','어너','고우','수흐체첵','아유르마','바르가','노민투야','에르데네체첵']
+    },
+    pe:{
+      m:['압바스','아프잘','알라이','아사드','아지즈','바시르','다니얄','파리둔','파르하드','가니','하미드','하룬','후맘','이마드','자비르','잠시드','자와드','주바이르','카림','칼릴','카이쿠스라우','마지드','만수르','미르자','무라드','나빌','오스만','라피','사이드','사미','소흐랍','타리크','우마르','와히드','야히야','자카리야','지야','쿠틀룩','바르삼','디나르','이르판','시나','파르칸','샤부르','나이므','카이다르','마릭'],
+      f:['아미나','아스마','바누','부란','다릴라','파르잔','파리바','골샤','골나즈','하피자','하비바','하미다','자밀라','라일리','말리카','만수레','마흐부베','미나','무니레','나심','나지마','나빌라','니기르','라비아','로샤나','사디카','살마','사미라','샤디','샤하르','타이바','토란','우미드','자리나','주바이다','줄레이카','다리아','파르니얀','쉬린','시린','아잠','골바르','마흐탑']
+    },
+    cn:{
+      m:['장무','왕단','유화','조환','진평','마용','손성','양준','서명','하안','노기','당백','우겸','임수','고열','심복','송성','정인','반수','채당','하진','주원','오진','소방','변안','전서','도설','강유','허종','백안','가준','방호','양천','신걸','문정','성진','연호','맹달'],
+      f:['월향','옥선','연희','매란','추란','영아','춘란','설매','소화','금옥','홍옥','옥매','채란','화란','단아','미화','숙란','정옥','소월','운란','희란','선화','명옥','하란','옥순','수란','향옥','난영','월란','춘옥','애란','영란','순옥','봉희','매옥','소홍','운화','채련']
+    },
+    ru:{
+      m:['아파나시','아르세니','아르테미','아브람','아킴','바르나바','보그단','브라니미르','베냐민','게라심','고르데이','다닐라','예멜리얀','예핌','예르몰라이','자하르','조시마','이그나트','이시도르','이폴리트','카르프','키릴','클리멘트','라자르','레온티','마카르','막심','마르크','미론','미트로판','니콜라이','니폰트','오시프','파벨','판텔레이','파호미','플라톤','포카','사바','세르게이','세라핌','타라스','티모페이','바를람','블라시','라도슬라프','라티보르','고스티슬라프','도브르냐','즈다네','벨리슬라프','류보미르','부이'],
+      f:['아쿨리나','아가타','아그니야','아리나','아나스타시야','바실리사','베라','베로니카','갈리나','도미니카','옙피미야','제나이다','조야','이울리야','카테리나','키라','클라바','류바','류보피','마리나','미르라','나데즈다','니나','파라스케바','펠라게야','폴리나','라이사','사비나','스테파니다','타이시야','테클라','우스티냐','빅토리야','밀라','젤레나','헬레나','프레드슬라바','베시슬라바','도브로슬라바','라다','베셀리나','보제나','즐라타','네젤라','밀로슬라바','야로슬라바']
+    },
+    eu:{
+      m:['보이치에흐','야쿠프','마치에이','파베우','마르친','안제이','야로스와프','보구스와프','도비에스와프','술리스와프','시비엥토스와프','즈비그니에프','그니에보미르','미클로시','발라주','페테르','게르게이','뢰린츠','베르탈란','베네데크','도몬코시','데네시','아코시','차나드','발린트','미하이','람페르트','폰그라츠','티보르','줄러','졸탄','벤체','다비드','바르톨로미에이','프란치셰크','루드비크','오토카르','스타시','브와디','예지','타데우시','크시슈토프','보이슬라프','우르반','줄리안','보도미르','라도미르','믈라덴','드라고미르','베소','자하리아슈'],
+      f:['보구미와','도브로니에가','리우도미와','마그다','마리아','야니나','아그니에슈카','헬레나','엘레오노라','에바','엠마','쥐지','줄리아','클라라','오르솔랴','카탈린','에스테르','에다','플로리나','가브리엘라','이렌','카를라','나탈리아','베로니카','안젤리카','엘리슈카','루치아','마가레타','마틸다','리디아','우르술라','잉에보르가','비올라','이자벨라','스테파니아','크리스티나','콘스탄치아','루드밀라','믈라다','라도슬라바','보제나','드라고미라','리부셰','밀로슬라바','베라','프레미슬라','네이다','안제리카']
+    },
+    ko:{
+      m:['귀동','돌쇠','삼돌','막동','개동','복돌','덕쇠','삼룡','득수','금동','판돌','학이','석이','쇠돌','마동','천수','일석','이석','칠성','상룡','용수','봉수','대복','만복','천복','덕보','귀수','사량','일룡'],
+      f:['순덕','막덕','복덕','귀덕','말례','영례','옥례','점례','금례','춘덕','삼덕','석녀','봉덕','월례','득례','복례','끝녀','분례','귀례','영덕','소덕','옥덕','정례','연례','만덕','일덕','막례']
+    }
+  };
+  for(const c in ADD){
+    const base=NM[c];if(!base)continue;
+    for(const g of ['m','f']){
+      const seen=new Set(base[g]);
+      ADD[c][g].forEach(n=>{
+        if(seen.has(n)||NAME_BLOCK.has(n)||NAME_KIN[n])return;
+        seen.add(n);base[g].push(n);
+      });
+    }
+  }
+})();
 </script>
