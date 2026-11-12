@@ -6441,7 +6441,7 @@ v9ask('v12_master_conc',1.2,v12concOK,P=>{
    색에만 기대지 않도록 모든 표시에 아이콘과 짧은 글자(배지)를 함께 붙인다. */
 const V12KN={
   birth:['up','＋','탄생'],wed:['up','✓','혼인'],reunion:['up','✓','재회'],
-  death:['down','†','부고'],missing:['down','?','소식 끊김'],captive:['down','!','포로'],split:['down','!','이산'],
+  death:['down','†','부고'],frdeath:['down','†','부고'],missing:['down','?','소식 끊김'],captive:['down','!','포로'],split:['down','!','이산'],
   /* 인편·전언으로 들은 가족 소식(직접 만나지 못함): 손주 탄생·친정/고향 근황·행방 모르던 가족의 생존·시집간 딸/며느리 소식 */
   grand:['up','＋','인편 소식'],news:['up','✉','인편 소식'],newsbad:['down','✉','인편 소식'],kinsman:['up','✉','친척 소식']
 };
@@ -6473,8 +6473,12 @@ function v12kn(line,strict){
   if(/포로로 끌려|끌려가 소식이 끊김/.test(line))return 'captive';
   if(/소식이 끊|생사를 알 수 없|실종/.test(line))return 'missing';
   if(/되찾았다/.test(line)&&/(배우자|아내|딸|어머니|부인|옛 아내)/.test(line))return 'reunion';
+  /* 친구의 죽음(v5 tieTick 의 '친구 ○○(이)가 … 세상을 떠났다.')은 가족이 아니므로 '친구의 부고'로 따로 본다 */
+  if(/^친구 \S+/.test(line)&&/세상을 떠났다|사망|희생/.test(line))return 'frdeath';
   if(/전란으로 사망|중 희생|세상을 떠났다|여의었다|떠나보냈다/.test(line))return 'death';
   if(/^(아버지|어머니) \S+[을를] .*잃었다\./.test(line))return 'death';
+  /* 사산(v43_birthfix): 아이가 울음을 터뜨리지 못했다는 문장도 가족의 부고로 본다 */
+  if(/아이는 끝내 울음을 터뜨리지 못했다\./.test(line))return 'death';
   if(/시집갔다|혼인해 새 가정/.test(line))return 'wed';
   if(/(딸|아들|동생|손자|손녀)[^.\n]*태어났다/.test(line))return 'birth';
   return null;
@@ -6514,7 +6518,7 @@ const V12KCARD={
   birth:['','집안에 새 식구가 늘었다.'],wed:['',''],
   grand:[l=>/손녀를 얻었/.test(l)?'손녀를 얻다':'손자를 얻다',''],kinsman:['먼 친척의 소식',''],
   news:[l=>v12newsTitle(l),''],newsbad:[l=>v12newsTitle(l),''],
-  death:['가족의 부고',''],missing:['가족과 소식이 끊겼다',''],captive:['가족이 끌려갔다',''],split:['가족과 헤어졌다',''],reunion:['가족과 다시 만났다','']
+  death:['가족의 부고',''],frdeath:['친구의 부고',''],missing:['가족과 소식이 끊겼다',''],captive:['가족이 끌려갔다',''],split:['가족과 헤어졌다',''],reunion:['가족과 다시 만났다','']
 };
 /* 줄 속에 이름이 나온 가족을 찾는다: 같은 해 같은 소식이 다른 문장(결과문·기록)으로 두 번 나오는 것을 한 장으로 합치기 위함 */
 function v12kinWho(line){
@@ -9817,12 +9821,29 @@ function treeHTML0(){
     ${(P.spouse||P.kids.length)?`<p class="muted" style="font-size:12.5px;margin:6px 0 0">가정 화목 ${Math.round(P.harmony)}</p>`:''}
   </div>`;
 }
-function inlawBody(){
+function inlawPart(){
   const L=[];
   P.kids.forEach(k=>{if(k.inlaw)L.push(`<li>${esc(k.name)}의 ${k.inlaw.forced?'강제 혼인 상대':(k.female?'사위':'며느리')} <b>${esc(k.inlaw.name)}</b><br><span class="muted">${esc(k.inlaw.forced?'적진 · ':triLab(k.inlaw.tribe)+' · ')}${esc(k.inlaw.desc)} · ${k.inlaw.age||'?'}세${k.inlaw.forced?' · 포로로 끌려가 혼인당함':''}</span></li>`);});
   P.kids.forEach(k=>{if(k.alive&&!k.wed&&k.betrothal)L.push(`<li>${esc(k.name)}의 약혼자 <b>${esc(k.betrothal.x.name)}</b><br><span class="muted">${esc(triLab(k.betrothal.x.tribe))} · ${esc(k.betrothal.x.desc)} · 혼인할 나이가 되면 혼례</span></li>`);});
   const al=(P.allies||[]).map(t=>esc(triLab(t)));
   return (L.length?`<div class="tree"><ul class="root">${L.join('')}</ul></div>`:'<p class="muted" style="margin:0">아직 맺은 사돈이 없다.</p>')+(al.length?`<p class="muted" style="font-size:12.5px;margin:8px 0 0">혼인 동맹 · ${al.join(', ')}</p>`:'');
+}
+
+/* 인연 탭: 사돈 관계(기존)와 친구 관계(P.ties 의 friend)를 함께 보여 준다. 사망 표시는 가계도와 같은 deadTag·붉은 표시를 쓴다 */
+function friendPart(){
+  const F=(P.ties||[]).filter(t=>t&&t.kind==='friend'&&t.name);
+  if(!F.length)return '<p class="muted" style="margin:0">아직 사귄 친구가 없다.</p>';
+  const li=F.map(t=>{
+    const st=t.alive===false?deadTag(t):(t.wed?' · 혼인':(t.cut?' · 사이가 틀어짐':(t.apart?' · 멀리 떨어져 지냄':'')));
+    const who=[t.tribe?triLab(t.tribe):'',t.desc||'',t.age!=null?t.age+'세':''].filter(Boolean).map(esc).join(' · ');
+    return `<li>친구 <b>${esc(t.name)}</b> <span class="muted">(${who}${st})</span></li>`;
+  }).join('');
+  return `<div class="tree"><ul class="root">${li}</ul></div>`;
+}
+function inlawBody(){
+  const h=t=>`<div class="sec" style="margin:10px 0 4px;font-size:14px">${t}</div>`;
+  const html=h('사돈')+inlawPart()+h('친구')+friendPart();
+  return typeof v12kinTree==='function'?v12kinTree(html):html;
 }
 
 /* ----- 플레이 화면 ----- */
@@ -9842,7 +9863,7 @@ function dateTxt(){
   return `${P.year}년 · ${ganji(P.year)} · ${animalOf(P.year)}의 해 · ${seasonOf(f)}`;
 }
 function tabsHTML(){
-  const T=[['tree','가계도'],['inlaw','사돈'],['map','지도'],['log','연표'],['focus','중점']];
+  const T=[['tree','가계도'],['inlaw','인연'],['map','지도'],['log','연표'],['focus','중점']];
   return T.map(([k,n])=>`<button class="tab" data-act="tab" data-k="${k}" aria-pressed="${V.tab===k}">${n}</button>`).join('');
 }
 function pboxHTML(){
@@ -10038,7 +10059,7 @@ function showEnding(){
     <div class="endphrase">${esc(S.phrase)}</div>
     <p class="past" style="white-space:pre-line">${S.paras.map(esc).join('\n')}</p>
     <div class="sec">남은 가계도</div><div class="tree">${treeHTML()}</div>
-    <div class="sec">사돈</div>${inlawBody()}
+    <div class="sec">인연</div>${inlawBody()}
     <div class="sec">삶의 연표</div>
     <details class="tlbox" id="tlbox"><summary><span class="tlopen">펼쳐서 보기</span><span class="tlclose">접기</span><em>${(P.log||[]).length}건의 기록</em></summary><div class="tl">${log}</div></details>
     <button class="btn primary" id="again" style="margin-top:22px">다시 태어나기</button>
