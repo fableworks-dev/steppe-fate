@@ -1621,7 +1621,7 @@ function family(){
   /* 출산 */
   const mothers=P.female?(P.spouse&&P.spouse.alive&&!P.spouse.apart&&P.age>=16&&P.age<=40?[P.name]:(typeof concFather==='function'&&concFather()&&P.age>=16&&P.age<=40?[P.name]:[])):liveWives().filter(w=>w.apart!=='sold'&&w.age>=16&&w.age<=40).map(w=>w.name);
   const living=P.kids.filter(k=>k.alive&&!k.adoptive).length; /* 출산 인원 제한은 친자녀 기준(입양아 제외) */
-  if(living<8)mothers.forEach(m=>{if(!P.dead)conceive(m);});
+  if(living<15)mothers.forEach(m=>{if(!P.dead)conceive(m);});
 }
 
 /* ===== 일상 지문과 노예 해방 ===== */
@@ -5126,7 +5126,7 @@ v9ask('c_widowed',3,P=>{
 
 /* --- want_child (선택, Manus) : 출산 계획. 선택은 기존 임신 시스템의 P.wish(babyWish)에 기록만 하고,
    임신·출산 확률과 장면은 conceive/babyChoice가 그대로 처리한다(want=×1.4, delay=×.35, fate=기본). 효과 수치는 원본에도 없다. --- */
-v9ask('f_want_child',1.5,P=>P.female&&P.status!=='slave'&&spHome(P)&&P.age>=16&&P.age<=40&&P.kids.filter(k=>k.alive&&!k.adoptive).length<8,P=>{
+v9ask('f_want_child',1.5,P=>P.female&&P.status!=='slave'&&spHome(P)&&P.age>=16&&P.age<=40&&P.kids.filter(k=>k.alive&&!k.adoptive).length<15,P=>{
   return v7sc('아이를 가질까','{sp}와(과) 아이 이야기를 나누었다. 이 시대에는 아이가 많을수록 집안이 든든하다고 여겼지만, 아이 하나를 먹이고 지키는 것도 쉬운 일이 아니다.'.replace('{sp}',P.spouse.name),[
     {t:'아이를 바란다. 식구가 늘기를 기도한다',fn:()=>{P.wish={k:'want',until:P.year+3};return v7RN('두 사람은 아이를 기다리기로 마음을 모았다.');}},
     {t:'형편을 생각해 아직은 이르다고 한다',sub:'그래도 뜻대로 되지 않을 수 있다',fn:()=>{P.wish={k:'delay',until:P.year+3};return v7RN('두 사람은 당분간 아이를 미루기로 했다. 그러나 이 시대에 뜻대로 되는 일만은 아니었다.');}},
@@ -10325,6 +10325,17 @@ title();
    - 확인 여부: localStorage 'tengri_updlog_seen'(기존 저장 키와 별도)에 마지막으로 확인한 기록의 id를 저장한다.
      id 가 그보다 큰 기록이 있으면 NEW 를 보여 준다. 저장소를 못 쓰는 환경에서는 새로고침 전까지만 유지된다. */
 const UPDATE_LOG=[
+  {id:'2026/11/17',date:'2026/11/17',title:'11/17 업데이트',sections:[
+    {h:'새로운 콘텐츠',items:[
+      '정해진 혼인·눈에 띈 포로·혼인을 명하다 추가',
+      '남성 플레이어의 약탈혼 추가',
+      '친부를 모르는 아이에 대한 이야기 추가',
+      '돌아온 아내 추가',
+      '레비레이트혼 추가',
+      '자식 수 상한 높임',
+      '다처제 추가'
+    ]}
+  ]},
   {id:'2026/11/14',date:'2026/11/14',title:'11/14 업데이트',sections:[
     {h:'새로운 콘텐츠',items:[
       '황금씨족과의 혼인 후 직위와 이벤트 추가: 카툰·구레겐',
@@ -12327,4 +12338,457 @@ v9ask('v60_chief_relief',3.0,P=>v60free(P)&&v7chief(P)&&v60famine(P)&&P.wealth>=
     {t:'제 식구와 가까운 이들부터 챙긴다',sub:'재산을 지키지만 명성 −−',fn:()=>{fx({fame:-5});return v7RN('{me}은(는) 자기 식구와 가까운 이들부터 챙겼다. 곳간은 지켰으나 가난한 천막들의 원망이 오래 남았다.');}}
   ],'다스림');
 },{cool:8});
+/* ===== v61: 약탈혼 후속 1단계 =====
+   (1) 약탈혼 전에 낳은 자녀: 친정 식구처럼 곁에서 떨어져 소식이 끊긴다(기존 apart='left' + known 체계 그대로).
+       일부(약 40%)는 생존 소식이 영영 오지 않고, 나머지는 kinNews 가 간간이 뒤늦게 전한다. 사망은 기존 pend → kinNews 경로가 전한다.
+       P.kids 의 자녀 객체에 쓰는 값은 기존 필드(away/apart/known/newsAlive)뿐이며 삭제·이동은 없다.
+   (5) 약탈혼 이후 아이·배우자를 낯설게 대하는 일상 문장과 선택 사건 1종. 호감도(P.harmony)·체력(P.hp)에 따라 문장이 갈린다(읽기만 함).
+   (6) 친부를 모르는 아이(k.father.uncertain)의 출생 질문·놀림 사건 1종. 아이마다 한 번(P.done).
+   출산 상한은 v2a.js·v9_family.js 의 숫자만 15로 올렸다(10번).
+   혼인 상태·신분·직업은 건드리지 않는다. */
+const v61raid=P=>!!(P.female&&P.flags&&P.flags.raided&&P.spouse&&P.spouse.alive&&P.spouse.origin==='약탈혼'&&!P.dead&&P.status==='free');
+const v61harm=P=>P.harmony==null?50:P.harmony;
+const v61since=P=>(P.spouse&&typeof P.spouse.since==='number')?P.year-P.spouse.since:99;
+
+/* (1) 약탈혼 전 자녀와 소식이 끊긴다 */
+const v61rs0=raidSettle;
+raidSettle=function(){
+  v61rs0.apply(this,arguments);
+  try{v61cutKids();}catch(e){}
+};
+function v61cutKids(){
+  (P.kids||[]).forEach(k=>{
+    if(!k||!k.alive||k.lost||k.away||k.apart||k.warTogether||k.hidden||k.wed)return;
+    k.away=true;k.apart='left';k.known={age:k.age,year:P.year,stay:1};
+    if(Math.random()<.4)k.newsAlive=1; /* 생존 소식이 영영 오지 않는 아이(사망 소식만 기존 경로로 전해질 수 있다) */
+    const t=(k.female?'딸 ':'아들 ')+k.name+': 기존 거처에 남음(소식이 끊겨 근황을 알 수 없음)';
+    addLog(t);recapLine(t);
+  });
+}
+
+/* 조사 중 확인된 기존 구멍: 아기·아이 의례 사건 4종(kid_young·kid_name·kid_haircut·kid_horse)은 P.kids 를 살아 있음(alive)만 보고 골라서,
+   곁을 떠난 자녀(apart/away)도 곁에 있는 것처럼 장면에 나온다(노예 때 고향에 남은 자녀도 마찬가지). 사건 본문은 그대로 두고,
+   조건·장면을 만드는 동안만 곁에 없는 자녀를 보이지 않게 하고 바로 되돌린다(데이터는 바뀌지 않는다). */
+['kid_young','kid_name','kid_haircut','kid_horse'].forEach(id=>{
+  const e=GEN.find(x=>x.id===id);if(!e)return;
+  const wrap=f=>function(){
+    const hid=(P.kids||[]).filter(k=>k&&k.alive&&(k.apart||k.away));
+    hid.forEach(k=>{k.alive=false;});
+    try{return f.apply(this,arguments);}finally{hid.forEach(k=>{k.alive=true;});}
+  };
+  e.cond=wrap(e.cond);e.mk=wrap(e.mk);
+});
+
+/* (5) 약탈혼 이후 아이와 배우자를 낯설게 대하는 일상 */
+const v61kid=P=>(P.kids||[]).filter(k=>k&&k.alive&&kinHere(k)&&k.mother===P.name&&k.age<=12&&k.father&&(k.father.rel==='captor'||k.father.uncertain));
+const v61spOk=P=>v61raid(P)&&spHome(P)&&v61since(P)<=12;
+V7POOLS.push(
+ ['v61_kid_cold',P=>v61raid(P)&&v61since(P)<=12&&v61kid(P).length>0&&(v61harm(P)<45||P.hp<45),1.0,[
+  "아이가 품으로 파고들었지만 {me}은(는) 한 박자 늦게 팔을 내밀었다. 이 아이를 보면 이곳에 오기 전의 일이 먼저 떠올랐다.",
+  "아이의 얼굴에서 누구를 찾으려는 건지 {me}은(는) 스스로도 알 수 없었다. 서둘러 시선을 돌리고 젖은 손을 닦았다.",
+  "아이가 처음 걸음을 뗄 때에도 {me}은(는) 마음 한쪽이 얼어 있었다. 기뻐해야 한다는 것을 알면서도 웃음이 늦게 나왔다.",
+  "밤에 아이가 울어도 {me}은(는) 한참을 일어나지 못했다. 이 아이가 미운 것이 아니라 이 자리가 낯선 것이라고 스스로에게 말했다."]],
+ ['v61_kid_mid',P=>v61raid(P)&&v61since(P)<=12&&v61kid(P).length>0&&v61harm(P)>=45&&v61harm(P)<60&&P.hp>=45,1.0,[
+  "아이를 안고 있으면 마음이 풀렸다가도 문득 낯설어졌다. 이 천막의 아이라는 사실이 때때로 가슴에 걸렸다.",
+  "아이가 {me}을(를) 어머니라 불렀다. {me}은(는) 대답을 하면서도 어딘가 먼 곳을 바라보고 있었다.",
+  "아이는 아무것도 모르고 웃었다. {me}은(는) 그 웃음이 고맙고도 어려웠다."]],
+ ['v61_kid_soft',P=>v61raid(P)&&v61since(P)<=12&&v61kid(P).length>0&&v61harm(P)>=60&&P.hp>=45,1.0,[
+  "아이가 처음으로 {me}의 손을 먼저 잡았다. 가슴 한쪽이 먹먹했지만 {me}은(는) 그 손을 놓지 않았다.",
+  "아이가 잠든 얼굴을 한참 들여다보았다. 이곳에서 태어난 아이도 결국 {me}의 아이였다.",
+  "아이의 웃음소리가 천막 안을 채우자 낯선 곳이 조금은 집처럼 느껴졌다."]],
+ ['v61_sp_cold',P=>v61spOk(P)&&(v61harm(P)<45||P.hp<40),1.0,[
+  "천막 안에서 남편과 나란히 앉아 있었지만 둘 사이에는 말이 없었다. 가까워지지도 멀어지지도 못한 채 한 해가 또 지나갔다.",
+  "남편이 건넨 그릇을 받으면서도 {me}은(는) 눈을 맞추지 못했다. 그의 손이 닿는 것이 아직도 낯설었다.",
+  "남편이 웃으면 {me}은(는) 어떻게 따라 웃어야 할지 몰랐다. 이 사람의 이름을 입에 올리는 일조차 아직 어색했다."]],
+ ['v61_sp_mid',P=>v61spOk(P)&&v61harm(P)>=45&&v61harm(P)<60&&P.hp>=40,1.0,[
+  "남편은 말수가 적었지만 {me}의 몫을 먼저 챙겼다. {me}은(는) 그것을 알면서도 고맙다는 말을 꺼내지 못했다.",
+  "어떤 날은 이 사람이 이웃처럼 느껴졌고, 어떤 날은 남처럼 느껴졌다. {me}은(는) 그 사이 어디쯤에 서 있었다."]],
+ ['v61_sp_soft',P=>v61spOk(P)&&v61harm(P)>=60&&P.hp>=40,1.0,[
+  "낯선 {me}을(를) 위해 남편이 먼저 마유주를 따라 주었다. {me}은(는) 그것을 거절하지 않았다.",
+  "남편과 나란히 앉아 불을 쬐는 밤이 늘었다. 말이 없어도 어색하지 않은 때가 조금씩 찾아왔다."]]
+);
+v9ask('v61_raid_child',0.9,P=>v61raid(P)&&P.age>=17&&v61since(P)<=10&&v61kid(P).some(k=>k.age<=8),P=>{
+  const k=v7pick(v61kid(P).filter(x=>x.age<=8));
+  return v7sc('낯선 아이','아이 '+k.name+'이(가) 울다 지쳐 {me}의 옷자락을 붙잡고 있다. 이 아이를 안아야 한다는 것은 알지만, 마음 한쪽이 선뜻 움직이지 않는다.',[
+    {t:'품에 안고 달랜다',sub:'마음이 풀리지만 기운이 든다',fn:()=>{fx({hp:-2,fame:1});return '{me}은(는) 아이를 품에 안고 한참 달랬다. 아이가 잠들고 나서야 {me}의 어깨에서도 힘이 빠졌다. 곁에서 지켜보던 사람들은 {me}을(를) 달리 보았다.';}},
+    {t:'거리를 두고 지켜본다',sub:'쉬지만 아이와는 멀어진다',fn:()=>{fx({hp:1});return '{me}은(는) 아이가 스스로 울음을 그칠 때까지 곁에서 지켜보기만 했다. 아이는 어느새 잠들었지만, 둘 사이에는 말없는 거리가 남았다.';}},
+    {t:'남편에게 맡긴다',sub:'기운은 아끼지만 평판에 걸린다',fn:()=>{fx({hp:2,fame:-1});return '{me}은(는) 아이를 남편에게 건네고 천막 밖으로 나갔다. 아이는 곧 그치고 웃었지만, 이웃들은 {me}의 뒷모습을 오래 바라보았다.';}}
+  ],'가정');
+},{cool:6});
+
+/* (6) 친부를 모르는 아이의 출생 질문·놀림 */
+const v61unc=P=>(P.kids||[]).filter(k=>k&&k.alive&&kinHere(k)&&k.age>=6&&k.age<=16&&k.father&&k.father.uncertain&&!P.done['v61_uf_'+(k.bid!=null?k.bid:k.name)]);
+v9ask('v61_unknown_father',1.2,P=>v7nf(P)&&!P.dead&&P.age>=18&&v61unc(P).length>0,P=>{
+  const k=v7pick(v61unc(P));if(!k)return null;
+  P.done['v61_uf_'+(k.bid!=null?k.bid:k.name)]=1;
+  const who=k.female?'딸':'아들';
+  const text=k.age<=9
+    ?'아이 '+k.name+'이(가) {me}에게 다가와 물었다. 자기는 누구를 닮았느냐고, 다른 아이들의 아버지처럼 자기 아버지는 어디 있느냐고.'
+    :'아이 '+k.name+'이(가) 울며 돌아왔다. 이웃 아이들이 아비 없는 아이라 놀렸다는 것이다. 그리고 {me}에게 물었다. 정말 자기 아버지는 누구냐고.';
+  return v7sc('아이의 물음',text,[
+    {t:'아는 만큼 사실대로 들려준다',sub:'아이가 상처받지만 신뢰가 남는다',fn:()=>{fx({hp:-2});return '{me}은(는) 아이에게 지나온 일을 아는 만큼만, 그러나 숨기지 않고 들려주었다. 아이는 오래 말이 없었지만 그날 밤 {me}의 곁에서 잠들었다. 친부가 누구인지는 끝내 알 수 없다는 말까지 함께였다.';}},
+    {t:'먼 곳에 있는 훌륭한 사람이라 둘러댄다',sub:'당장은 편하지만 불씨가 남는다',fn:()=>{
+      if(v7roll(.4)){fx({hp:-3});return '{me}은(는) 아이에게 "먼 곳의 훌륭한 사람"이라고만 말했다. 아이는 고개를 끄덕였지만, 이웃의 말과 다르다는 것을 곧 눈치채고 의심의 눈빛으로 {me}을(를) 바라보았다.';}
+      fx({hp:1});return '{me}은(는) 아이에게 "먼 곳의 훌륭한 사람"이라고만 말했다. 아이는 고개를 끄덕이고 다시 놀러 나갔다. 그 말이 오래 갈지는 알 수 없었다.';}},
+    {t:'놀린 아이들의 집을 찾아가 따진다',sub:'명성이 오를 수도, 이웃과 틀어질 수도 있다',fn:()=>{
+      if(v7roll(.6)){fx({fame:2,hp:-1});return '{me}은(는) 직접 그 집들을 찾아가 따졌고, 이웃들은 한동안 말을 조심했다. 아이는 그 뒤로 조금 덜 움츠러들었다.';}
+      fx({fame:-2,hp:-1});return '{me}은(는) 직접 그 집들을 찾아가 따졌지만 도리어 이웃들의 반감만 샀다. 사이는 서먹해졌고, 아이를 향한 수군거림도 사라지지 않았다.';}}
+  ],'가정');
+},{cool:6});
+
+/* ===== 일상 문장 정리: 곁에 어린 자녀가 없으면 '아이들' 문장이 나오지 않게 한다 =====
+   생업 일상(j_herd_lean / j_herd_plenty)의 '아이들 …' 문장은 자녀가 곁에 있을 때만 나오는 별도 풀로 옮긴다(문장은 그대로). */
+(function(){
+  const home=P=>(P.kids||[]).some(k=>k&&k.alive&&!k.lost&&!k.away&&!k.apart&&!k.hidden&&!k.wed&&k.age<=14);
+  [['j_herd_lean',/아이들 몫부터/],['j_herd_plenty',/아이들은 배불리/]].forEach(([id,re])=>{
+    const p=V7POOLS.find(x=>x[0]===id);if(!p||!Array.isArray(p[3]))return;
+    const i=p[3].findIndex(t=>typeof t==='string'&&re.test(t));if(i<0)return;
+    const line=p[3].splice(i,1)[0],total=p[3].length+1,oc=p[1];
+    V7POOLS.push([id+'_kids',P=>oc(P)&&home(P),Math.max(.2,p[2]/total),[line]]);
+  });
+})();
+/* ===== v62: 정해진 혼인 · 눈에 띈 포로 · 혼인을 명하다 + 혼인에 따른 신분 상승 =====
+   기존 이벤트·함수는 고치지 않고 새로 얹는다. 황금씨족과의 혼인은 v34Spouse(→v54: 카툰·구레겐)를 그대로 쓴다.
+   노욘 등 귀족과의 혼인은 P.flags.v62 로 기록하고 신분 칸 표시('○○ 노욘의 안주인/사위')와 신분(rank)을 올린다. */
+const V62NOUN={steppe:'노욘',mongol:'노욘',jin:'관료',xia:'귀족',khw:'아미르',rus:'보야르',per:'귀족'};
+const v62noun=P=>V62NOUN[P.pol]||'귀족';
+const v62patron=P=>isMg(P)?R(['한 노욘','한 천호장']):P.pol==='jin'?'지방의 관료':P.pol==='khw'?'한 아미르':P.pol==='rus'?'한 보야르':'그 고장의 유력자';
+const v62tribe=P=>isMg(P)?'몽골족':(P.tribe||'');
+const v62nospouse=P=>widowed(P)&&!(P.cowives||[]).some(w=>w.alive);
+/* 포로·노예의 신분을 풀고 평민으로 둔다(혼인이 곧 신분 해제) */
+function v62lift(P){
+  if(P.status==='free')return;
+  P.status='free';P.rank=Math.max(1,P.rank||0);
+  try{capEndP('married');}catch(e){}
+  if(P.flags)delete P.flags.slave_years;
+  P.flags.v62freed={y:P.year};
+  if(!P.job)setJob('herder',0);
+}
+/* 노욘급 배우자: 새 배우자를 들이고 신분을 올린다 */
+function v62Noble(P,rk,how){
+  const fem=!P.female,noun=v62noun(P);
+  const c={name:nameFor(spouseCulture(),fem,null),age:Math.max(15,P.age+ri(-4,5)),alive:true,female:fem,tribe:v62tribe(P),rank:rk,
+    desc:noun+(fem?' 집안의 딸':' 집안의 사람'),noble:{noun,father:fem?null:nameFor(spouseCulture(),false,null)}};
+  adopt(c,how);
+  P.flags.v62={y:P.year,noun,rank:rk,spouse:c.name,father:c.noble.father,from:{job:P.job||null,lv:P.lv||0,rank:P.rank}};
+  P.harmony=50;
+  if(P.rank<rk)P.rank=rk;
+  recapLine(jf(P.female?'혼인으로 {me}의 자리가 달라졌다. 사람들은 이제 {me}을(를) '+noun+'의 안주인이라 불렀다.':'혼인으로 {me}의 자리가 달라졌다. 사람들은 이제 {me}을(를) '+noun+'의 사위로 대했다.'));
+  addLog(P.female?`${noun}의 안주인이 되었다.`:`${noun} 집안의 사위가 되었다.`);
+  return c;
+}
+function v62label(P){
+  const f=P&&P.flags&&P.flags.v62;if(!f||P.lineage||P.flags.v54)return null;
+  const sp=[P.spouse].concat(P.exSpouses||[]).find(x=>x&&x.name===f.spouse);
+  const cur=!!(sp&&sp.alive!==false&&P.spouse&&P.spouse.name===sp.name),dead=!!(sp&&sp.alive===false);
+  if(P.female){const h=f.noun+' '+f.spouse;return dead?h+'의 미망인':cur?h+'의 안주인':'지난날 '+h+'의 안주인';}
+  const h=f.noun+' '+(f.father||f.spouse);return dead?h+'의 사위 · 아내와 사별':cur?h+'의 사위':'지난날 '+h+'의 사위';
+}
+{const st=standing;standing=function(P){const s=st.apply(this,arguments);if(P&&P.status==='free'){try{const l=v62label(P);if(l)return l;}catch(e){}}return s;};}
+
+/* ---------- ② 정해진 혼인 ---------- */
+function v62Arr(P){
+  const fem=P.female,pt=v62patron(P),noun=v62noun(P),rk=Math.min(4,Math.max(3,P.rank+1));
+  const kin=fem?`${pt}의 아들(또는 ${pt} 자신)의 아내로 들이라는 뜻이 전해졌다.`:`${pt}의 딸을 아내로 맞으라는 뜻이 전해졌다.`;
+  const body=`{me}의 혼사에 윗사람의 뜻이 내려왔다. ${pt}이(가) {me}의 이름을 들었다며 ${kin} 청이 아니라 명에 가까웠고, 거절하면 그 뒤가 편치 않을 것이라는 말이 돌았다.`;
+  const wed=(eff,txt,forced)=>()=>{const c=v62Noble(P,rk,forced?'강제 혼인':'정해진 혼인');fx(eff);if(forced)P.harmony=36;
+    return `{me}은(는) ${c.name}와(과) 혼인했다. ${txt}`;};
+  return v7sc('정해진 혼인',body,[
+    {t:'뜻을 받아들인다',sub:'윗사람의 집안과 연이 닿는다 · 사람들은 이를 출세로도, 매인 몸으로도 본다',
+      fn:wed({wealth:ri(6,10),fame:ri(3,7)},fem?'낯선 집안의 천막에서 새 생활이 시작되었다. 사람들은 이제 {me}을(를) '+noun+'의 안주인으로 대했다.':'처가의 식구들 사이에서 새 생활이 시작되었다. 사람들은 이제 {me}을(를) '+noun+' 집안의 사위로 대했다.',false)},
+    {t:'저항한다',sub:'성공할 가능성이 낮다 · 실패하면 그대로 혼인하게 된다',
+      fn:()=>{if(v7roll(.2+P.sk.wit/500+P.fame/800)){fx({fame:-2,wealth:-ri(4,8)});P.flags.v62_defied=P.year;
+          return '{me}은(는) 끝내 뜻을 굽히지 않았다. 윗사람은 불쾌함을 거두지 않았고 한동안 {me}의 집에 일이 풀리지 않았으나, 혼담은 없던 일이 되었다.';}
+        return wed({wealth:ri(1,5),fame:-ri(3,7),hp:-ri(2,5)},'맞선 일은 오래 이야기되었고, 혼인은 처음 정해진 대로 치러졌다. 집안 사람들은 한동안 말을 아꼈다.',true)();}}
+  ],'혼인');
+}
+v9ask('v62_arranged',0.7,P=>P.status==='free'&&!P.dead&&!P.lineage&&!P.gest&&v62nospouse(P)&&!P.flags.raided&&!P.flags.goldenTie&&!P.flags.v62&&
+  P.rank>=0&&P.rank<=3&&P.age>=(P.female?16:18)&&P.age<=(P.female?36:45)&&P.fame>=5&&!P.done.v62_arr,
+  P=>{P.done.v62_arr=1;return v62Arr(P);},{cool:12});
+
+/* ---------- ④ 눈에 띈 포로 ---------- */
+function v62Noticed(P){
+  const r0=P.rank0||0,gold=r0>=2&&typeof v34Year==='function'&&v34Year(P)&&chance(r0>=4?.35:r0===3?.15:.06);
+  const fem=P.female,pt=v62patron(P);
+  const who=gold?'황금씨족의 한 사람':pt;
+  const kin=gold?(fem?'왕자 한 사람의 아내로':'공주 한 사람의 남편으로'):(fem?'아들(또는 자신)의 아내로':'딸의 남편으로');
+  const body=`포로의 몸으로 일하는 {me}의 모습이 ${who}의 눈에 들었다. ${who}은(는) {me}을(를) ${kin} 들이겠다고 했다. `+
+    (r0>=3?'{me}의 옛 집안이 가볍지 않았다는 것이 그의 마음을 움직인 듯했다.':'쓸 만한 사람이라는 이야기가 오래 돌던 끝이었다.');
+  const wed=(eff,txt,forced)=>()=>{v62lift(P);let c;
+    if(gold){c=v34Spouse(P,v34House(P),'c');addLog(`황금씨족 ${c.golden.house}가의 ${fem?'왕자':'공주'}와 혼인했다(${fem?'카툰':'구레겐'}).`);}
+    else c=v62Noble(P,r0>=4?4:3,forced?'강제 혼인':'포로의 혼인');
+    if(forced)P.harmony=34;fx(eff);
+    return `{me}은(는) ${c.name}와(과) 혼인했다. 포로의 신분은 풀렸다. ${txt}`;};
+  return v7sc('눈에 띈 포로',body,[
+    {t:'뜻을 받아들인다',sub:'포로의 신분에서 벗어난다 · 낯선 집안의 시선 속에서 살게 된다',
+      fn:wed({wealth:ri(8,14),fame:ri(3,7),hp:-ri(2,5)},gold?'낯선 오르도에서 새 생활이 시작되었다.':'혼인은 정해진 절차대로 치러졌고, 사람들은 {me}을(를) 달리 대하기 시작했다.',false)},
+    {t:'거절한다',sub:'안전하게 물러나기는 어렵다 · 실패하면 그대로 혼인하게 된다',
+      fn:()=>{if(v7roll(.12+P.sk.wit/600)){fx({hp:-ri(3,6),fame:1});return '{me}은(는) 목숨을 걸듯 거절했다. 그는 한동안 말이 없었으나 끝내 뜻을 거두었다. 이후로 {me}을(를) 보는 눈길이 한결 차가워졌다.';}
+        return wed({wealth:ri(2,6),fame:-ri(2,5),hp:-ri(6,12)},'거절은 받아들여지지 않았고, 혼인은 그의 뜻대로 치러졌다.',true)();}}
+  ],'혼인');
+}
+const v62capOk=P=>!P.lineage&&(P.status==='captive'||P.status==='slave')&&!P.dead&&!P.gest&&v62nospouse(P)&&P.age>=(P.female?14:16)&&P.age<=(P.female?38:42)&&!(P.cd&&P.cd.v62_noticed>P.year);
+[['a',0.5,r=>r<=1],['b',1.0,r=>r===2||r===3],['c',1.8,r=>r>=4]].forEach(([k,w,t])=>
+  v9ask('v62_noticed_'+k,w,P=>v62capOk(P)&&t(P.rank0||0),P=>{P.cd.v62_noticed=P.year+8;return v62Noticed(P);},{cool:8}));
+
+/* ---------- ③ 혼인을 명하다 ---------- */
+const v62high=P=>P.rank>=4||!!P.flags.v54||v7chief(P);
+function v62Command(P){
+  const fem=P.female,old=P.spouse&&P.spouse.alive?P.spouse:null;
+  const tf=!P.female,tn=nameFor(spouseCulture(),tf,null);
+  const mk=(how,rk)=>{const c={name:tn,age:Math.max(15,P.age-ri(8,18)),alive:true,female:tf,tribe:v62tribe(P),rank:rk,desc:spouseDesc(rk,tf,isMg(P))};
+    if(old){old.sepKind='step';old.stepY=P.year;}
+    adopt(c,how);P.harmony=how==='명한 혼인'?32:52;return c;};
+  const body=`{me}의 눈에 ${tn}이(가) 들어왔다. 신분이 낮은 집안의 사람이었으나, {me}이(가) 한마디만 하면 혼인은 성사될 것이다. `+(old?`곁에는 이미 ${old.name}이(가) 있다. `:'')+'그 사람의 뜻과 그 집안의 체면은 {me}의 말 앞에서 무게를 잃는다.';
+  return v7sc('혼인을 명하다',body,[
+    {t:'혼인을 명한다',sub:'명성이 떨어진다 · 재물이 든다'+(old?` · ${old.name}은(는) 곁을 비켜 선다`:''),fn:()=>{const c=mk('명한 혼인',2);fx({fame:-ri(3,6),wealth:-ri(5,10)});
+        addLog(`${c.name}에게 혼인을 명하였다.`+(old?` ${old.name}은(는) 곁을 비켜 섰다.`:''));
+        return `{me}의 명에 ${c.name}의 집안은 고개를 숙였다. 혼인은 치러졌으나 사람들은 뒤에서 말이 많았다.`+(old?` ${old.name}은(는) 말없이 자리를 내주었다.`:'');}},
+    {t:'청을 넣어 뜻을 묻는다',sub:'처세가 높을수록 받아들여진다 · 거절당할 수 있다',fn:()=>{
+        if(v7roll(.45+P.sk.wit/300+P.fame/500)){const c=mk('청한 혼인',2);fx({wealth:-ri(2,5),fame:1});
+          addLog(`${c.name}과(와) 혼인했다.`+(old?` ${old.name}은(는) 곁을 비켜 섰다.`:''));
+          return `예를 갖춰 청하자 ${c.name}의 집안이 뜻을 받아들였다. 혼인은 별 탈 없이 치러졌다.`+(old?` ${old.name}은(는) 한동안 말이 없었다.`:'');}
+        fx({fame:ri(0,1)});return '정중히 청했으나 상대 집안은 사양했다. {me}은(는) 더 밀어붙이지 않았다. 사람들은 그 일을 점잖게 받아들였다.';}},
+    {t:'마음을 접는다',sub:'없던 일로 한다',fn:()=>{fx({wit:1});return '{me}은(는) 한 번 가졌던 마음을 접었다. 아무도 그 일을 알지 못했다.';}}
+  ],'혼인');
+}
+v9ask('v62_command',0.5,P=>P.status==='free'&&!P.dead&&!P.gest&&v62high(P)&&P.fame>=20&&P.age>=25&&P.age<=60&&!P.flags.raided&&
+  (P.cowives||[]).every(w=>!w.alive),P=>v62Command(P),{cool:14});
+/* ===== v63: 돌아온 아내 · 이어받는 아내 · 고위 노욘의 부인들 (남성 플레이어 중심) =====
+   기존 함수는 고치지 않고 감싸거나 새 이벤트로 얹는다. ⑦ 끌려간 아내(v9_war 의 captive 기록)의 귀환과 아이,
+   ⑧ 아버지의 다른 부인·형제의 미망인, ⑨ 고위 노욘 이상의 부인 필수. */
+const v63mg=P=>!P.female&&isMg(P);
+const v63ok=P=>P.status==='free'&&!P.dead&&!P.gest;
+/* 끌려가 있던 아내가 낳은 아이: 친부는 끌고 간 쪽 */
+function v63child(o,yrs){
+  P.bseq=(P.bseq||0)+1;const f=chance(.5);
+  const k={name:nameFor(cultureOf(P),f),female:f,age:clamp(yrs-ri(1,2),0,12),alive:true,mother:o.name,kids:[],bid:P.bseq,
+    father:{name:(o.forcedWed&&o.forcedWed.by)||'끌고 간 사람',rel:'captor',year:P.year-yrs},returned:P.year};
+  P.kids.push(k);return k;
+}
+/* 되찾은 아내를 곁에 되돌린다 */
+function v63restore(o){
+  o.alive=true;o.lost=false;o.cause=null;o.age=(o.captive?(o.captive.age0||o.age)+(P.year-o.captive.y):o.age);delete o.forcedWed;o.v63='back';
+  if(P.spouse===o)return;
+  P.exSpouses=(P.exSpouses||[]).filter(x=>x!==o);P.cowives=(P.cowives||[]).filter(x=>x!==o);
+  if(!P.spouse||!P.spouse.alive){if(P.spouse)(P.exSpouses=P.exSpouses||[]).push(P.spouse);P.spouse=o;}
+  else{o.role='둘째 부인';(P.cowives=P.cowives||[]).push(o);}
+}
+/* 몸값으로 되찾을 때도 가끔 아이가 딸려 온다(기존 capRansom 을 감싼다: 결과 문장 뒤에 한 줄을 더한다) */
+{
+  const o=capRansom;
+  capRansom=function(w,kind,p,txt){
+    const was=w.captive&&w.captive.done,r=o.apply(this,arguments);
+    try{if(kind==='sp'&&!was&&w.captive&&w.captive.done==='ransomed'&&!P.female){
+      const yrs=Math.max(1,P.year-w.captive.y);
+      if(yrs>=2&&chance(.3)){const k=v63child(w,yrs);const t=`${w.name}이(가) 데려온 아이 ${k.name}은(는) 끌려간 곳에서 태어났다.`;addLog(t);recapLine(t);return r+' '+t;}}}catch(e){}
+    return r;};
+}
+/* ---------- ⑦ 돌아온 아내 ---------- */
+function v63cands(P){
+  const L=[P.spouse].concat(P.cowives||[],P.exSpouses||[]).filter(o=>o&&o.female&&o.captive&&o.captive.done&&o.captive.done!=='died'&&o.captive.done!=='ransomed'&&o.lost&&!o.alive&&!o.v63);
+  return L.filter(o=>{const y=P.year-o.captive.y,a=(o.captive.age0||o.age)+y;return y>=3&&y<=25&&a<=50;});
+}
+function v63Back(P){
+  const o=R(v63cands(P)),fate=o.captive.done,yrs=P.year-o.captive.y;
+  const wedLike=fate==='wed',withKid=chance(wedLike?.55:fate==='slave'?.35:.25);
+  const how=R(['밤을 틈타 도망쳐','상인의 짐수레에 숨어','주인이 죽은 혼란을 틈타']);
+  const body=`${yrs}년 전 끌려갔던 ${o.name}이(가) ${how} 돌아왔다. 야위고 말수가 줄었다. `+(withKid?'곁에는 그곳에서 낳은 아이가 있었다. ':'')+'사람들은 문 앞에 모여 수군거렸다.';
+  return v7sc('돌아온 아내',body,[
+    {t:withKid?'아내와 아이를 받아들인다':'아내를 받아들인다',sub:withKid?'아이의 아버지는 끌고 간 쪽이다 · 사람들의 말이 따른다':'함께한 세월이 있다 · 곁에 두면 다시 가족이 된다',fn:()=>{
+        v63restore(o);let t='';
+        if(withKid){const k=v63child(o,yrs);k.age=clamp(yrs-ri(1,2),1,10);t=` 아이 ${k.name}도 천막에 들였다.`;addLog(`${o.name}이(가) 데려온 아이 ${k.name}을(를) 거두었다.`);}
+        P.harmony=clamp(P.harmony||50,0,100);P.harmony=Math.max(25,P.harmony-ri(5,15));
+        fx({hp:ri(1,3),fame:withKid?-ri(0,2):ri(0,2),wealth:-ri(1,4)});addLog(`돌아온 ${o.name}을(를) 받아들였다.`);recapLine(`끌려갔던 ${o.name}이(가) 돌아와 곁으로 들어왔다.`);
+        return `${o.name}은(는) 한동안 말없이 앉아 있다가 천막 안쪽에 몸을 눕혔다. 서로 묻지 못한 말이 많았다.`+t;}},
+    {t:'맞아들이지 않는다',sub:'이미 지난 일로 둔다 · 사람들의 평이 갈린다',fn:()=>{o.v63='refused';fx({fame:-ri(2,5),wit:1});
+        addLog(`돌아온 ${o.name}을(를) 받아들이지 않았다.`);
+        return `{me}은(는) 문을 열지 않았다. ${o.name}은(는) 한참을 서 있다가 친정 쪽으로 걸어갔다. 사람들은 오래 그 일을 입에 올렸다.`;}}
+  ],'가정');
+}
+v9ask('v63_wife_back',1.0,P=>v63mg(P)&&v63ok(P)&&P.age>=25&&v63cands(P).length>0,P=>v63Back(P),{cool:5});
+/* ---------- ⑧ 이어받는 아내 ---------- */
+const v63recent=(o)=>o&&o.alive===false&&typeof o.diedYear==='number'&&o.diedYear<=P.year&&o.diedYear>=P.year-3&&o.apart!=='raid';
+function v63Widow(P,rel,dage){
+  return {name:nameFor(spouseCulture(),true,null),age:clamp(P.age+dage,18,44)};
+}
+function v63Inherit(P,w,rel,older){
+  const nm=w.name,ab=rel==='father'?'아버지의 젊은 부인':'형의 미망인';
+  const take=()=>{const c=makeSpouse((rel==='father'?'아버지의 부인(이어받음)':'형의 미망인(수계혼)'),{co:!!(P.spouse&&P.spouse.alive),rank:Math.max(1,P.rank),tribe:'몽골족',dage:w.age-P.age});
+    c.name=nm;c.age=w.age;c.desc=ab;return c;};
+  const opts=[
+    {t:'초원의 관습대로 거둔다',sub:'가축과 사람이 흩어지지 않는다 · '+(P.spouse&&P.spouse.alive?'본처와의 사이가 서먹해진다':'새 가정이 된다'),fn:()=>{
+        const had=P.spouse&&P.spouse.alive;take();fx({wealth:ri(4,9),fame:ri(0,2)});if(had)P.harmony=Math.max(25,(P.harmony||50)-ri(6,12));
+        addLog(`${ab} ${nm}을(를) 이어받았다.`);return `관습에 따라 ${nm}이(가) {me}의 천막으로 들어왔다. 죽은 이의 가축과 식솔이 한 집안에 남았다.`+(had?' 본처는 말없이 자리를 비켜 주었다.':'');}},
+    {t:'혼인하지 않고 집에 머물게 한다',sub:'보살피되 아내로 들이지는 않는다 · 재물이 든다',fn:()=>{fx({wealth:-ri(2,5),fame:ri(2,4)});P.flags.v63_care=P.year;
+        addLog(`${ab} ${nm}을(를) 집에 머물게 했다.`);return `${nm}은(는) 혼인하지 않은 채 {me}의 집 한쪽에서 지내게 되었다. 사람들은 인정이 두텁다고 했다.`;}},
+    {t:'친정으로 돌려보낸다',sub:'몫을 챙겨 보낸다',fn:()=>{fx({wealth:-ri(1,3),fame:-ri(0,2)});addLog(`${ab} ${nm}을(를) 친정으로 돌려보냈다.`);
+        return `${nm}은(는) 몫을 받아 친정으로 돌아갔다. 사람들은 이 일을 크게 말하지 않았다.`;}}
+  ];
+  const body=rel==='father'?`아버지의 장례가 끝난 뒤, 아버지의 젊은 부인 ${nm}(${w.age}세)의 거취가 남았다. 어머니는 아니다. 초원의 관습으로는 장성한 아들이 아버지의 다른 부인을 거두기도 한다.`
+    :`${w.bro}이(가) 세상을 떠난 뒤, 그의 미망인 ${nm}(${w.age}세)의 거취가 남았다. 초원에서는 형이 죽으면 아우가 형수를 거두기도 한다.`;
+  return v7sc(rel==='father'?'아버지의 부인':'남겨진 형수',body,opts,'수계혼');
+}
+v9ask('v63_inherit_father',1.0,P=>v63mg(P)&&v63ok(P)&&P.age>=18&&P.age<=55&&P.rank>=1&&P.father&&v63recent(P.father)&&P.father.age>=30&&!P.done.v63_fw,
+  P=>{P.done.v63_fw=1;if(!chance(.5))return null;const w=v63Widow(P,'father',-ri(2,12));return v63Inherit(P,w,'father',false);},{cool:1});
+const v63bro=P=>(P.sibs||[]).filter(s=>s&&!s.female&&s.wed&&v63recent(s)&&!s.v63w&&s.age>=22);
+v9ask('v63_inherit_brother',1.0,P=>v63mg(P)&&v63ok(P)&&P.age>=18&&P.age<=55&&v63bro(P).length>0,
+  P=>{const s=R(v63bro(P));s.v63w=1;if(!chance(.7))return null;const w=v63Widow(P,'brother',-ri(0,8));w.bro=s.name;return v63Inherit(P,w,'brother',!!s.older);},{cool:1});
+/* ---------- ⑨ 고위 노욘 이상은 부인을 여럿 둔다(필수) ---------- */
+function v63need(P){return P.lineage||P.flags.v54?3:P.rank>=5?3:P.rank>=4?2:(v7chief(P)?2:0);} /* 두는 부인 수: 본처 포함 목표 */
+const v63wives=P=>1+(P.cowives||[]).filter(w=>w.alive!==false&&!w.lost).length;
+function v63Many(P){
+  const no=v63wives(P)+1,rk=Math.min(5,Math.max(3,P.rank)),opt=(t,sub,fn)=>({t,sub,fn});
+  const mk=(origin,desc)=>{const c=makeSpouse(wifeOrd(no)+'으로 맞이함',{co:true,rank:rk});c.origin=wifeOrd(no)+'으로 맞이함';if(desc)c.desc=desc;return c;};
+  const body=`${v62noun(P)}의 자리에 오른 {me}에게는 천막이 하나로 부족하다는 말이 나돌았다. 여러 부인을 거느리는 것은 지위에 맞는 일이며, 부인들의 집안은 곧 {me}의 우군이 된다. 이제 ${wifeNth(no)} 부인을 들일 때다.`;
+  return v7sc('부인을 더 들이다',body,[
+    opt('동맹 부족의 딸을 맞는다','동맹이 굳어진다 · 예물이 든다',()=>{const c=mk('', '동맹 부족의 딸');fx({fame:ri(3,6),wealth:-ri(6,12)});P.flags.allies=(P.flags.allies||0)+1;addLog(`${c.name}을(를) ${wifeOrd(no)}으로 맞았다.`);return `${c.name}이(가) 예물과 함께 {me}의 천막에 들어왔다. 두 집안의 동맹은 한층 굳어졌다.`;}),
+    opt('정복한 땅의 귀족 집안에서 맞는다','상대 땅에서 {me}의 이름이 높아진다 · 원망이 남는다',()=>{const c=mk('', '굴복한 집안의 딸');fx({fame:ri(1,4),wealth:ri(2,6)});P.harmony=Math.max(25,(P.harmony||50)-ri(2,6));addLog(`${c.name}을(를) ${wifeOrd(no)}으로 맞았다.`);return `${c.name}은(는) 굴복한 집안의 뜻에 따라 {me}의 천막에 들어왔다. 눈빛에는 경계가 남아 있었다.`;}),
+    opt('집안 어른이 정해 준 사람을 맞는다','체면은 서지만 마음은 크게 움직이지 않는다',()=>{const c=mk('', '집안의 정한 혼처');fx({fame:ri(1,3),wealth:-ri(2,6)});addLog(`${c.name}을(를) ${wifeOrd(no)}으로 맞았다.`);return `집안 어른이 정한 대로 ${c.name}이(가) 천막에 들어왔다. 예법은 어긋남이 없었다.`;})
+  ],'가정');
+}
+v9ask('v63_many_wives',4.0,P=>v63mg(P)&&v63ok(P)&&!P.flags.raided&&P.age>=26&&P.age<=60&&P.spouse&&P.spouse.alive&&P.wealth>=10&&v63need(P)>v63wives(P)&&v63wives(P)<4&&(P.cowives||[]).length<3,P=>v63Many(P),{cool:3});
+/* 필수: 조건이 되면 일반 이벤트 추첨에 맡기지 않고 해마다 확실히 올린다(대기열에 같은 장면이 있으면 건너뜀) */
+{
+  const h=yearHook;
+  yearHook=function(){const r=h.apply(this,arguments);
+    try{const c=(P.cd=P.cd||{});
+      if(v63mg(P)&&v63ok(P)&&!P.flags.raided&&P.age>=26&&P.age<=60&&P.spouse&&P.spouse.alive&&P.wealth>=10&&v63need(P)>v63wives(P)&&v63wives(P)<4&&(P.cowives||[]).length<3&&!(c.v63_many_wives>P.year)&&!G.q.some(q=>q&&q.title==='부인을 더 들이다')){
+        c.v63_many_wives=P.year+3;G.q.push(v63Many(P));}}catch(e){}
+    return r;};
+}
+
+/* ===== ⑦ 돌아온 아내와 아이: 일상 문장과 사건 ===== */
+const v63rk=(P,max)=>(P.kids||[]).filter(k=>k&&k.returned&&k.alive&&kinHere(k)&&k.age<=(max||16));
+const v63rw=P=>[P.spouse].concat(P.cowives||[]).find(w=>w&&w.v63==='back'&&w.alive&&!w.lost&&P.year-(w.captive?w.captive.y:P.year)<=30);
+const v63recentBack=(P,y)=>{const w=v63rw(P);return !!w&&w.backY!==undefined&&P.year-w.backY<=y;};
+{ /* 귀환 해를 기록(문장·사건의 기간 판정용) */
+  const o=v63restore;v63restore=function(w){const r=o.apply(this,arguments);try{w.backY=P.year;}catch(e){}return r;};
+}
+V7POOLS.push(
+ ['v63_wife_back_a',P=>v63mg(P)&&v63recentBack(P,6)&&(P.harmony||50)<50,1.2,[
+  '밤마다 아내는 바깥의 작은 소리에도 몸을 움츠렸다. {me}은(는) 아무 말 없이 곁에 앉아 불이 잦아들 때까지 있었다.',
+  '아내는 끌려가 있던 때의 이야기를 한마디도 꺼내지 않았다. {me}도 묻지 않았다. 묻지 않는 것이 이 집의 약속이 되었다.',
+  '이웃 아낙들이 아내를 보고 수군거리다 {me}을(를) 보자 말을 멈추었다. 아내는 고개를 숙이고 물동이를 이고 지나갔다.']],
+ ['v63_wife_back_b',P=>v63mg(P)&&v63recentBack(P,6)&&(P.harmony||50)>=50,1.2,[
+  '아내가 오랜만에 소리 내어 웃었다. 화덕 불빛에 비친 얼굴이 낯설면서도 익숙했다.',
+  '아내는 천막 살림을 다시 제 손으로 바로잡았다. 흩어졌던 물건들이 하나씩 제자리를 찾았다.',
+  '아내가 먼 곳에서 배운 노래를 낮게 흥얼거렸다. {me}은(는) 그것이 어디서 온 노래인지 묻지 않고 끝까지 들었다.']],
+ ['v63_ret_kid_a',P=>v63rk(P).length>0&&P.year-v63rk(P)[0].returned<=10,1.1,[
+  '낯선 땅에서 태어난 아이가 {me}의 말투와 다른 억양으로 중얼거렸다. 아이는 그것이 어디서 온 것인지 몰랐다.',
+  '아이는 다른 아이들 사이에서 곧잘 한 걸음 물러서 있었다. 누가 아버지냐는 말이 돌 때마다 눈을 내리깔았다.',
+  '아이가 {me}의 소매를 잡고 따라다녔다. 피가 이어졌는지는 아이에게 중요하지 않은 듯했다.',
+  '이웃 아이들이 아이의 눈매를 두고 수군거렸다. 아이는 모르는 척하며 양들을 몰고 돌아왔다.']],
+ ['v63_ret_kid_b',P=>v63rk(P).length>0&&P.year-v63rk(P)[0].returned>10,.9,[
+  '아이는 이제 이 천막의 아이로 자랐다. 말과 걸음걸이가 {me}을(를) 닮아 가는 것이 이상하게도 뭉클했다.',
+  '자란 아이가 문득 먼 곳을 바라보았다. 그곳이 어디인지 묻지는 않았다.']]
+);
+/* 아이를 둘러싼 말 */
+v9ask('v63_ret_gossip',1.1,P=>P.status==='free'&&v63rk(P,14).some(k=>k.age>=4&&!P.done['v63_g_'+k.bid]),P=>{
+  const k=v63rk(P,14).find(x=>x.age>=4&&!P.done['v63_g_'+x.bid]);P.done['v63_g_'+k.bid]=1;
+  return v7sc('아이를 둘러싼 말',`${k.name}이(가) 다른 아이들에게 "아버지가 다르다"는 놀림을 받고 울며 돌아왔다. 소문은 ${k.name}의 출생을 두고 한동안 사그라지지 않았다.`,[
+    {t:'아이를 안아 달랜다',sub:'아이의 마음을 먼저 살핀다',fn:()=>{fx({hp:1});return `{me}은(는) ${k.name}을(를) 안고 오래 앉아 있었다. 아이는 울다가 지쳐 잠들었다.`;}},
+    {t:'놀린 아이의 부모를 찾아간다',sub:'명성이 오를 수도, 사이가 틀어질 수도 있다',fn:()=>{if(v7roll(.5+P.fame/400)){fx({fame:2});return '말을 전하자 상대 부모가 아이를 꾸짖었다. 더는 놀리는 소리가 들리지 않았다.';}fx({fame:-2});return '상대 부모는 아이들 일이라며 대수롭지 않게 넘겼다. 이웃과의 사이만 서먹해졌다.';}},
+    {t:'못 들은 척 둔다',fn:()=>{fx({wit:1});P.harmony=Math.max(20,(P.harmony||50)-2);return `${k.name}은(는) 그날 이후 말수가 줄었다. 시간이 흐르기를 기다릴 뿐이었다.`;}}
+  ],'가정');},{cool:4});
+/* 아이의 물음 */
+v9ask('v63_ret_ask',1.1,P=>P.status==='free'&&v63rk(P,16).some(k=>k.age>=7&&!P.done['v63_q_'+k.bid]),P=>{
+  const k=v63rk(P,16).find(x=>x.age>=7&&!P.done['v63_q_'+x.bid]);P.done['v63_q_'+k.bid]=1;
+  return v7sc('아이의 물음',`${k.name}이(가) 어느 날 조용히 물었다. "나는 어디서 태어났어요? 아버지는 어떤 사람이에요?" 아이는 이미 누군가에게서 이야기를 들은 듯했다.`,[
+    {t:'사실대로 말해 준다',sub:'아이가 받아들이는 데 시간이 걸린다',fn:()=>{fx({wit:1});return `{me}은(는) 끌려간 곳에서 태어났다는 것, 아버지가 {me}이(가) 아니라는 것을 천천히 말해 주었다. ${k.name}은(는) 한참 말이 없다가 "그래도 여기가 집이에요"라고 했다.`;}},
+    {t:'"네 아버지는 나다"라고 말한다',sub:'당장은 아이가 안심한다 · 훗날 알게 될 수 있다',fn:()=>{fx({fame:1});k.hidden_truth=1;return `${k.name}은(는) 고개를 끄덕이고 {me}의 품으로 파고들었다. 거짓이 언제까지 이어질지는 알 수 없었다.`;}},
+    {t:'말을 돌린다',fn:()=>{fx({wit:-1});return `{me}은(는) 어른이 되면 이야기해 주겠다고 했다. ${k.name}은(는) 더 묻지 않았으나 마음에 남은 듯했다.`;}}
+  ],'가정');},{cool:3});
+/* 돌아온 아내의 밤 */
+v9ask('v63_wife_night',1.2,P=>P.status==='free'&&v63mg(P)&&v63recentBack(P,5)&&!P.done.v63_wn,P=>{
+  P.done.v63_wn=1;const w=v63rw(P);
+  return v7sc('돌아온 아내의 밤',`${w.name}이(가) 한밤에 소스라쳐 깨어났다. 끌려가 있던 때의 일이 꿈에 나온 듯했다. 불을 켜자 눈빛에 경계가 가득했다.`,[
+    {t:'곁에서 말없이 지켜 준다',fn:()=>{P.harmony=Math.min(100,(P.harmony||50)+ri(3,7));fx({hp:-1});return `${w.name}은(는) 한참 만에 숨을 고르고 {me}의 옷자락을 쥐었다. 아침이 올 때까지 둘은 말이 없었다.`;}},
+    {t:'지난 일을 묻는다',sub:'답을 들을 수도, 마음을 닫게 할 수도 있다',fn:()=>{if(v7roll(.4+P.sk.wit/300)){P.harmony=Math.min(100,(P.harmony||50)+ri(2,6));return `${w.name}은(는) 띄엄띄엄 이야기를 꺼냈다. 이야기가 끝나자 둘 다 오래 울었다.`;}P.harmony=Math.max(15,(P.harmony||50)-ri(4,9));return `${w.name}은(는) 입을 닫고 돌아누웠다. 그날 이후 한동안 말이 줄었다.`;}},
+    {t:'시간을 주기로 하고 자리를 비켜 준다',fn:()=>{fx({wit:1});return `{me}은(는) 천막 밖에서 새벽까지 서 있었다. ${w.name}은(는) 날이 밝자 아무 일 없다는 듯 불을 지폈다.`;}}
+  ],'가정');},{cool:2});
+/* ===== v64: 남성 플레이어의 약탈혼(신부를 데려오다) =====
+   독립 이벤트 + 기존 전쟁 사건(w_plunder '약탈의 유혹')에 선택지 하나를 덧붙이는 방식. 기존 사건의 본문은 건드리지 않는다.
+   약탈해 온 아내: w.origin='약탈혼', w.captured={y,src}, w.bond(0~100: 마음의 거리). 부인이 이미 있으면 둘째 부인으로 들인다. */
+const v64mg=P=>!P.female&&isMg(P);
+const v64wives=P=>[P.spouse].concat(P.cowives||[]).filter(w=>w&&w.origin==='약탈혼'&&w.captured&&w.alive!==false&&!w.fled);
+const v64can=P=>v64mg(P)&&P.status==='free'&&!P.dead&&!P.gest&&P.age>=17&&P.age<=55&&!P.flags.raided&&!P.flags.goldenTie&&(P.cowives||[]).filter(w=>w.alive).length<3;
+const V64FOE=['타타르족','메르키트족','나이만족','케레이트족','옹기라트족','타이치우트족'];
+function v64Tribe(P,src){const f=P.flags.raidFoe&&P.flags.raidFoe.tribe;if(src==='war')return f||R(V64FOE);return R(V64FOE);}
+function v64Take(P,src){
+  const had=!!(P.spouse&&P.spouse.alive),tb=v64Tribe(P,src);
+  const w=makeSpouse('약탈혼',{co:had,rank:1,tribe:tb,dage:-ri(3,12)});
+  w.age=Math.max(15,w.age);w.since=P.year;w.captured={y:P.year,src,age0:w.age};w.bond=ri(18,34);
+  if(!had)P.harmony=w.bond;else P.harmony=Math.max(25,(P.harmony||50)-ri(4,9));
+  P.flags.takenBride=P.year;
+  return w;
+}
+function v64Scene(P,src){
+  const tb=v64Tribe(P,src),had=!!(P.spouse&&P.spouse.alive),war=src==='war';
+  const body=war?`성이 무너진 뒤 포로들 사이에서 한 젊은 여인이 눈에 띄었다. 겁에 질렸으나 고개를 숙이지 않았다. 동료들이 "저 여자는 네 몫이다"라며 웃었다.`
+    :`${tb} 천막촌을 친 날 새벽, 포로 가운데 한 여인이 {me}의 눈에 들어왔다. 이 초원에서 신부를 데려오는 일은 오래된 풍습이다. 그러나 여인의 집안은 이 일을 오래 잊지 않을 것이다.`;
+  return v7sc(war?'정복지의 여인':'신부를 데려오다',body+(had?' 곁에는 이미 아내가 있다.':''),[
+    {t:'아내로 삼는다',sub:'초원의 오랜 풍습이다 · 마음을 얻기까지 시간이 든다'+(had?' · 본처와의 사이가 서먹해진다':''),fn:()=>{
+        const w=v64Take(P,src);fx({fame:war?-ri(0,2):ri(0,2),wealth:ri(0,3),hp:0});addLog(`${w.name}을(를) 아내로 삼았다(약탈혼).`);recapLine(`${tb} 출신의 ${w.name}을(를) 데려와 아내로 삼았다.`);
+        return `${w.name}은(는) ${had?'둘째 부인으로':'아내로'} {me}의 천막에 들어왔다. 눈을 마주치지 않았고, 첫 며칠은 음식에도 손을 대지 않았다.`;}},
+    {t:'몸값을 받고 돌려보낸다',sub:'재물을 얻는다 · 여인은 가족에게 돌아간다',fn:()=>{fx({wealth:ri(4,10),fame:1});return '여인의 가족이 가축을 몰고 와 몸값을 치렀다. 여인은 한 번도 뒤돌아보지 않고 떠났다.';}},
+    {t:'손대지 않는다',sub:war?'동료들의 비웃음을 산다':'체면을 잃을 수 있다',fn:()=>{fx({fame:war?2:-1,wit:1});return war?'{me}은(는) 고개를 저었다. 어떤 동료는 비웃었고, 어떤 동료는 말없이 그 자리를 비켜 주었다.':'{me}은(는) 여인을 그대로 두고 말머리를 돌렸다. 같이 온 사람들은 의아해했다.';}}
+  ],war?'전쟁':'혼인');
+}
+/* 독립 이벤트: 평시(초원의 풍습) / 최근 출정·전란기에는 가중치를 높인다 */
+const v64free=P=>v64can(P)&&P.fame>=5&&P.rank<=4&&!(P.cd&&P.cd.v64_next>P.year);
+v9ask('v64_steal_bride',0.45,P=>v64free(P)&&!warYear(P.year)&&P.flags.campaigned_recent==null,P=>{P.cd.v64_next=P.year+10;return v64Scene(P,'raid');},{cool:10});
+v9ask('v64_steal_bride_war',1.2,P=>v64free(P)&&(warYear(P.year)||(P.flags.campaigned_recent!=null&&P.year-P.flags.campaigned_recent<=1)),P=>{P.cd.v64_next=P.year+10;return v64Scene(P,'war');},{cool:10});
+/* 기존 '약탈의 유혹'에 선택지 덧붙임 */
+{const e=GEN.find(x=>x.id==='w_plunder');if(e){const mk=e.mk;e.mk=function(P){const s=mk.apply(this,arguments);
+  try{if(s&&s.opts&&v64can(P)&&!(P.cd&&P.cd.v64_next>P.year)&&!s.opts.some(o=>o.v64)){s.opts.push({v64:1,t:'포로 가운데 한 여인을 아내로 삼는다',sub:'초원의 풍습이다 · 후폭풍이 따른다',fn:()=>{P.cd.v64_next=P.year+10;return {text:'동료들이 환호했다. {me}은(는) 포로들 가운데 한 여인에게 다가갔다.',next:v64Scene(P,'war')};}});}}catch(x){}
+  return s;};}}
+
+/* ---------- 약탈해 온 아내와의 생활 ---------- */
+const v64pool=(P,lo,hi)=>v64mg(P)&&v64wives(P).some(w=>P.year-w.captured.y<=12&&w.bond>=lo&&w.bond<hi);
+V7POOLS.push(
+ ['v64_cold',P=>v64pool(P,0,40),1.6,[
+  '약탈해 온 아내는 밤마다 천막 구석에 등을 돌리고 누웠다. {me}은(는) 그 등을 오래 바라보다 불을 껐다.',
+  '아내는 음식을 차려 놓고도 한 숟갈 뜨지 않았다. 고향의 말로 혼잣말을 하다가 {me}이(가) 들어오면 입을 다물었다.',
+  '아내가 천막 밖에서 멀리 해 지는 쪽을 오래 바라보았다. 그쪽이 고향임을 {me}은(는) 알았다.']],
+ ['v64_mid',P=>v64pool(P,40,65),1.5,[
+  '아내가 처음으로 먼저 말을 걸었다. 우유가 끓어 넘친다는 짧은 말이었지만 {me}은(는) 한참 그 말을 곱씹었다.',
+  '아내는 이 천막의 살림을 조금씩 제 손에 익혀 갔다. 경계하는 눈빛은 남아 있었으나 이제는 도망칠 길을 살피지 않았다.',
+  '아내가 고향의 노래를 낮게 흥얼거렸다. {me}이(가) 다가가자 노래를 멈추었지만 자리를 피하지는 않았다.']],
+ ['v64_soft',P=>v64pool(P,65,101),1.5,[
+  '아내가 {me}의 해진 옷소매를 말없이 기워 놓았다. 처음 끌려온 날의 눈빛을 {me}은(는) 가끔 떠올렸다.',
+  '해가 기울자 아내가 먼저 불을 지폈다. 같은 화덕 곁에 앉아도 더는 어색하지 않았다.',
+  '이웃 아낙이 아내의 고향 말투를 흉내 내자 아내가 웃었다. {me}은(는) 그 웃음이 이곳에서 처음이라는 것을 알았다.']]
+);
+/* 해마다 마음의 거리가 조금씩 좁아진다(아이가 있으면 더 빠르게) */
+{const h=yearHook;yearHook=function(){const r=h.apply(this,arguments);
+  try{if(v64mg(P)){v64wives(P).forEach(w=>{const kid=(P.kids||[]).some(k=>k&&k.mother===w.name&&k.alive);
+      w.bond=clamp((w.bond||30)+ri(0,3)+(kid?2:0)-(P.hp<35?1:0),0,100);});
+    if(P.spouse&&P.spouse.origin==='약탈혼'&&P.spouse.captured&&v64wives(P).includes(P.spouse))P.harmony=Math.round(((P.harmony||50)+P.spouse.bond)/2);}}catch(e){}
+  return r;};}
+/* 달아나려는 아내 */
+v9ask('v64_runaway',1.1,P=>P.status==='free'&&v64mg(P)&&v64wives(P).some(w=>P.year-w.captured.y<=5&&w.bond<45&&!w.v64run),P=>{
+  const w=v64wives(P).find(x=>P.year-x.captured.y<=5&&x.bond<45&&!x.v64run);w.v64run=1;
+  const leave=(why)=>{w.fled=true;w.sepKind='fled';if(P.spouse===w){P.spouse=null;}P.cowives=(P.cowives||[]).filter(x=>x!==w);(P.exSpouses=P.exSpouses||[]).push(w);addLog(`${w.name}이(가) ${why} 떠났다.`);};
+  return v7sc('달아나려는 아내',`${w.name}이(가) 말 한 필과 마른 고기를 챙겨 천막 뒤쪽으로 가는 것을 보았다. 고향으로 가려는 것이 분명했다. 지금 막지 않으면 다시 볼 수 없다.`,[
+    {t:'붙잡아 둔다',sub:'성공해도 마음이 더 멀어진다',fn:()=>{if(v7roll(.7+P.sk.ride/300)){w.bond=Math.max(0,w.bond-ri(6,12));fx({fame:0});return `${w.name}을(를) 말 위에서 끌어 내렸다. 그날 이후 ${w.name}은(는) 오래 말이 없었다.`;}leave('말을 타고 달아나');fx({fame:-2});return `쫓았으나 ${w.name}은(는) 강을 건너 사라졌다. 사람들은 {me}이(가) 아내 하나 못 붙잡았다며 수군거렸다.`;}},
+    {t:'놓아 준다',sub:'떠난다 · 사람들은 도량을 말한다',fn:()=>{leave('보내 주자 홀로');fx({fame:2,wit:1});return `{me}은(는) 말고삐를 건네며 길을 일러 주었다. ${w.name}은(는) 한참 {me}을(를) 바라보다 말을 몰았다.`;}},
+    {t:'곁에 앉아 이야기를 건넨다',sub:'처세가 높을수록 마음이 움직인다',fn:()=>{if(v7roll(.35+P.sk.wit/250)){w.bond=Math.min(100,w.bond+ri(8,14));return `{me}은(는) 고향 이야기를 청했고, ${w.name}은(는) 밤이 깊도록 말을 이었다. 말 한 필은 그대로 매여 있었다.`;}leave('밤을 틈타');fx({fame:-1});return `${w.name}은(는) 말없이 듣다가 새벽에 사라졌다. 말 한 필과 함께였다.`;}}
+  ],'가정');},{cool:2});
+/* 아내의 친정 소식 */
+v9ask('v64_her_kin',1.0,P=>P.status==='free'&&v64mg(P)&&v64wives(P).some(w=>P.year-w.captured.y>=3&&P.year-w.captured.y<=14&&!w.v64kin),P=>{
+  const w=v64wives(P).find(x=>P.year-x.captured.y>=3&&P.year-x.captured.y<=14&&!x.v64kin);w.v64kin=1;
+  return v7sc('아내의 친정 소식',`떠돌이 상인이 ${w.tribe||'먼 부족'} 쪽 소식을 전했다. ${w.name}의 집안은 아직 그 천막촌에서 살고 있다고 했다. ${w.name}은(는) 아직 그 소식을 모른다.`,[
+    {t:'아내에게 소식을 전한다',fn:()=>{w.bond=Math.min(100,w.bond+ri(4,9));return `${w.name}은(는) 한참 말이 없더니 고개를 숙였다. 그날 밤 처음으로 {me} 쪽을 보고 누웠다.`;}},
+    {t:'예물을 보내 안부를 전한다',sub:'재물이 든다 · 두 집안의 감정이 풀린다',fn:()=>{fx({wealth:-ri(5,10),fame:2});w.bond=Math.min(100,w.bond+ri(8,14));return `예물과 함께 사람을 보냈다. 답례로 작은 선물이 돌아오자 ${w.name}의 얼굴이 처음으로 풀렸다.`;}},
+    {t:'말하지 않는다',fn:()=>{w.bond=Math.max(0,w.bond-ri(0,4));return '{me}은(는) 소식을 가슴에 묻었다. 아내가 알게 될 날이 올지는 알 수 없었다.';}}
+  ],'가정');},{cool:3});
+/* 아이가 태어나 마음이 풀리다 */
+v9ask('v64_child_soften',1.2,P=>P.status==='free'&&v64mg(P)&&v64wives(P).some(w=>!w.v64child&&w.bond<70&&(P.kids||[]).some(k=>k&&k.mother===w.name&&k.alive&&k.age<=2)),P=>{
+  const w=v64wives(P).find(x=>!x.v64child&&x.bond<70&&(P.kids||[]).some(k=>k&&k.mother===x.name&&k.alive&&k.age<=2));w.v64child=1;
+  const k=P.kids.find(q=>q.mother===w.name&&q.alive&&q.age<=2);
+  return v7sc('아이가 태어난 뒤',`${w.name}이(가) 품에 안은 ${k.name}을(를) 오래 내려다보았다. 이 천막에서 처음으로 ${w.name}의 얼굴에 경계가 아닌 다른 표정이 떠올랐다.`,[
+    {t:'아이를 함께 안아 준다',fn:()=>{w.bond=Math.min(100,w.bond+ri(10,16));fx({hp:1});return `${w.name}은(는) {me}의 팔에 아이를 맡겼다. 아무 말도 없었지만 그것이 처음의 허락이었다.`;}},
+    {t:'아이 이름을 아내에게 짓게 한다',sub:'고향의 이름을 허락한다',fn:()=>{w.bond=Math.min(100,w.bond+ri(12,18));fx({fame:1});return `${w.name}은(는) 고향의 말로 아이의 이름을 불렀다. 사람들은 그 이름을 낯설어했으나 {me}은(는) 그대로 두었다.`;}}
+  ],'가정');},{cool:2});
 </script>
