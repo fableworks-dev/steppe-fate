@@ -4745,7 +4745,7 @@ v9ask('c_inheritance',1.2,v9inhCond,P=>{
   const hr=st&&typeof v52heir==='function'?v52heir(P):null; /* 몽골족 가정의 실제 계승 후보(v52_children.js) */
   const sonsOut=hr?P.kids.filter(k=>k.alive&&!k.female&&k!==hr&&typeof v52ind==='function'&&v52ind(k)).length:0;
   const sonsIn=hr?P.kids.filter(k=>k.alive&&!k.female&&k!==hr&&!(typeof v52ind==='function'&&v52ind(k))&&!kidAway(k)).length:0;
-  const optT=hr?('관습대로 막내 '+hr.name+'에게 화덕을 맡기고'+(sonsIn?', 형들은 몫을 나눠 분가시킨다':(sonsOut?' 이미 따로 난 형들은 그대로 둔다':'')))
+  const optT=hr?('관습대로 막내 '+hr.name+(sonsIn?'에게 화덕을 맡기고, 형들은 몫을 나눠 분가시킨다':(sonsOut?'에게 화덕을 맡기고 이미 따로 난 형들은 그대로 둔다':'에게 화덕을 맡긴다')))
                :(st?'관습대로 막내에게 화덕을 맡기고, 형들은 몫을 나눠 분가시킨다':'관습대로 맏이에게 집과 농지를 물려준다');
   o.push({t:optT,fn:()=>{
     kids().forEach(k=>bd(k,ri(-4,4)));
@@ -12464,6 +12464,8 @@ function v62lift(P){
   P.flags.v62freed={y:P.year};
   if(!P.job)setJob('herder',0);
 }
+/* 여성이 혼인으로 안주인이 되면 '귀부인의 길' 제안(careerCheck)에서 다시 '귀한 집안의 딸'로 시작하지 않도록, 생업 없는 상태(목축·무직)라면 직업을 이미 '가문의 안주인'으로 둔다 */
+function v62jobfix(P){if(P&&P.female&&P.flags&&P.flags.v62&&(!P.job||P.job==='herder')&&P.status==='free'){setJob('lady',1);P.flags.v62jobfix=1;}}
 /* 노욘급 배우자: 새 배우자를 들이고 신분을 올린다 */
 function v62Noble(P,rk,how){
   const fem=!P.female,noun=v62noun(P);
@@ -12473,6 +12475,7 @@ function v62Noble(P,rk,how){
   P.flags.v62={y:P.year,noun,rank:rk,spouse:c.name,father:c.noble.father,from:{job:P.job||null,lv:P.lv||0,rank:P.rank}};
   P.harmony=50;
   if(P.rank<rk)P.rank=rk;
+  v62jobfix(P);
   recapLine(jf(P.female?'혼인으로 {me}의 자리가 달라졌다. 사람들은 이제 {me}을(를) '+noun+'의 안주인이라 불렀다.':'혼인으로 {me}의 자리가 달라졌다. 사람들은 이제 {me}을(를) '+noun+'의 사위로 대했다.'));
   addLog(P.female?`${noun}의 안주인이 되었다.`:`${noun} 집안의 사위가 되었다.`);
   return c;
@@ -12554,6 +12557,9 @@ function v62Command(P){
 }
 v9ask('v62_command',0.5,P=>P.status==='free'&&!P.dead&&!P.gest&&v62high(P)&&P.fame>=20&&P.age>=25&&P.age<=60&&!P.flags.raided&&
   (P.cowives||[]).every(w=>!w.alive),P=>v62Command(P),{cool:14});
+
+/* 이미 혼인으로 안주인이 된 여성(이전에 진행한 삶 포함)도 같은 방식으로 정리한다 */
+{const h=yearHook;yearHook=function(){const r=h.apply(this,arguments);try{if(P.flags&&P.flags.v62&&!P.flags.v62jobfix)v62jobfix(P);}catch(e){}return r;};}
 /* ===== v63: 돌아온 아내 · 이어받는 아내 · 고위 노욘의 부인들 (남성 플레이어 중심) =====
    기존 함수는 고치지 않고 감싸거나 새 이벤트로 얹는다. ⑦ 끌려간 아내(v9_war 의 captive 기록)의 귀환과 아이,
    ⑧ 아버지의 다른 부인·형제의 미망인, ⑨ 고위 노욘 이상의 부인 필수. */
