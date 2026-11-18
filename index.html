@@ -435,18 +435,15 @@ function jobTitle(P){
   return titles(P,P.job)[P.lv];
 }
 
-/* 출생 연도·세력을 바깥(v79_birthrate.js)에서 정해 줄 때 쓰는 값. null 이면 예전처럼 무작위 */
-let BP=null;
-const birthYear=()=>(BP&&BP.year)?BP.year:ri(1160,1260);
 function rollBirth(){
-  const year=birthYear();
+  const year=ri(1160,1260);
   const p={born:year,year,age:0,female:chance(.5),pol:'steppe',tribe:'',clan:'',region:'',rank:1,lineage:null,
     hp:ri(62,82),fame:0,wealth:0,sk:{ride:0,arch:0,know:0,wit:0,craft:0},job:null,lv:0,status:'free',
     spouse:null,kids:[],flags:{},done:{},log:[],dead:false,cause:'',subject:false,wives:0,parents:'',
     peakJob:null,peakLv:-1,lastOffer:0,name:''};
   if(year<1206){p.pol='steppe';p.tribe=wpick(TRIBES.map(t=>[t.id,t.w]));}
   else{
-    p.pol=(BP&&BP.cat&&['mongol','jin','khw','rus','xia','per'].includes(BP.cat))?BP.cat:wpick([['mongol',44],['jin',year<=1234?24:10],['khw',year<=1231?18:8],['rus',10],['xia',year<=1227?6:2],['per',4]]);
+    p.pol=wpick([['mongol',44],['jin',year<=1234?24:10],['khw',year<=1231?18:8],['rus',10],['xia',year<=1227?6:2],['per',4]]);
     if(p.pol==='mongol')p.tribe=wpick(TRIBES.map(t=>[t.id,t.w]));
     else p.region=R(REGIONS[p.pol]);
   }
@@ -8240,7 +8237,7 @@ function koNews(y,t){
 
 /* ---------- 출생 ---------- */
 function koBirth(){
-  const year=birthYear();
+  const year=ri(1160,1260);
   const p={born:year,year,age:0,female:chance(.5),pol:'goryeo',tribe:'',clan:'',region:R(REGIONS.goryeo),rank:1,lineage:null,
     hp:ri(62,82),fame:0,wealth:0,sk:{ride:0,arch:0,know:0,wit:0,craft:0},job:null,lv:0,status:'free',
     spouse:null,kids:[],flags:{},done:{},log:[],dead:false,cause:'',subject:false,wives:0,parents:'',
@@ -8271,7 +8268,7 @@ initFamily=function(p){
 };
 const _koRollBirth=rollBirth;
 rollBirth=function(){
-  if(BP?BP.cat==='goryeo':(KO_RATE>0&&chance(KO_RATE)))return koBirth();
+  if(KO_RATE>0&&chance(KO_RATE))return koBirth();
   return _koRollBirth.apply(this,arguments);
 };
 
@@ -10358,8 +10355,7 @@ const UPDATE_LOG=[
       '아내 약탈 상황 추가',
       '노예의 가족 강제 혼인 상황 추가',
       '자손에게 고위 혼담이 오는 이벤트 추가',
-      '1170~1205년, 1260~1330년의 평시 이벤트와 시대 분위기 지문, 이어지는 이야기 추가',
-      '출생 지역·부족 확률 조정'
+      '1170~1205년, 1260~1330년의 평시 이벤트와 시대 분위기 지문, 이어지는 이야기 추가'
     ]}
   ]},
   {id:'2026/11/18',date:'2026/11/18',title:'11/18 업데이트',sections:[
@@ -13228,7 +13224,7 @@ const UG_REL={
   '카슈가르':[['budd',.04],['nest',.06],['muslim',.9]]
 };
 function ugBirth(){
-  const year=birthYear();
+  const year=ri(1160,1260);
   const p={born:year,year,age:0,female:chance(.5),pol:'uyghur',tribe:'',clan:'',region:R(REGIONS.uyghur),rank:1,lineage:null,
     hp:ri(62,82),fame:0,wealth:0,sk:{ride:0,arch:0,know:0,wit:0,craft:0},job:null,lv:0,status:'free',
     spouse:null,kids:[],flags:{},done:{},log:[],dead:false,cause:'',subject:false,wives:0,parents:'',
@@ -13259,7 +13255,7 @@ initFamily=function(p){
 };
 const _ugRollBirth=rollBirth;
 rollBirth=function(){
-  if(BP?BP.cat==='uyghur':(UG_RATE>0&&chance(UG_RATE)))return ugBirth();
+  if(UG_RATE>0&&chance(UG_RATE))return ugBirth();
   return _ugRollBirth.apply(this,arguments);
 };
 
@@ -13546,7 +13542,7 @@ function soNews(y,t){
 
 /* ---------- 출생 ---------- */
 function soBirth(){
-  const year=birthYear();
+  const year=ri(1160,1260);
   const p={born:year,year,age:0,female:chance(.5),pol:'song',tribe:'',clan:'',region:R(REGIONS.song),rank:1,lineage:null,
     hp:ri(62,82),fame:0,wealth:0,sk:{ride:0,arch:0,know:0,wit:0,craft:0},job:null,lv:0,status:'free',
     spouse:null,kids:[],flags:{},done:{},log:[],dead:false,cause:'',subject:false,wives:0,parents:'',
@@ -13577,7 +13573,7 @@ initFamily=function(p){
 };
 const _soRollBirth=rollBirth;
 rollBirth=function(){
-  if(BP?BP.cat==='song':(SO_RATE>0&&chance(SO_RATE)))return soBirth();
+  if(SO_RATE>0&&chance(SO_RATE))return soBirth();
   return _soRollBirth.apply(this,arguments);
 };
 
@@ -15433,53 +15429,6 @@ const v78raidLive=P=>!!(P.spouse&&P.spouse.alive&&!P.spouse.lost&&P.spouse.origi
     return r;
   };
 }
-/* ===== v79: 출생 확률 재조정(1단계) + 같은 세력·지역·시대 반복 방지 =====
-   목표(전체): 몽골·초원 44 / 금 12 / 남송 12 / 동유럽(루스) 8 / 호라즘 7 / 고려 6 / 페르시아 5 / 위구르 4 / 서하 2 (%)
-   - 1206년 이전에는 초원·남송·고려·위구르만 태어날 수 있으므로(기존 규칙 유지) 연도에 따라 가능한 세력의 비율을 나눈다.
-   - 최근 6번의 출생(세력·지역·연대)을 localStorage 에 기억한다(쓸 수 없으면 새로고침 전까지만). 같은 세력은 한 번 겹칠 때마다 확률 절반,
-     같은 10년 구간도 한 번 겹칠 때마다 절반, 같은 지역이 나오면 몇 번 다시 굴린다(전부 막지는 않는다).
-   - #ko #song #ug 등 디버그 스위치(KO_RATE·SO_RATE·UG_RATE 가 기본값이 아닐 때)는 예전 방식 그대로 동작한다. */
-const BP_KEY='tengri_birthmem';
-let BP_MEM=null;
-function bpLoad(){
-  if(BP_MEM)return BP_MEM;
-  try{const a=JSON.parse(localStorage.getItem(BP_KEY)||'[]');BP_MEM=Array.isArray(a)?a.slice(-6):[];}catch(e){BP_MEM=[];}
-  return BP_MEM;
-}
-function bpSave(){try{localStorage.setItem(BP_KEY,JSON.stringify(BP_MEM.slice(-6)));}catch(e){}}
-const bpDebug=()=>SO_RATE!==0.08||UG_RATE!==0.06||KO_RATE!==0.08;
-function bpWeights(year){
-  const pre=year<1206,w=[['song',12],['goryeo',6],['uyghur',4]];
-  if(pre){w.push(['mongol',78]);}
-  else{
-    w.push(['mongol',15.6],['jin',22*(year<=1234?1:.55)],['khw',12.8*(year<=1231?1:.5)],['rus',14.7],['xia',3.7*(year<=1227?1:.35)],['per',9.2]);
-  }
-  return w;
-}
-/* 반복 방지로 줄어드는 몫(자주 나오는 세력일수록 더 깎임)을 되돌리는 보정값. 몬테카를로로 목표 비율에 맞춰 둔 값 */
-const BP_SCALE={mongol:2.7,song:0.58,goryeo:0.54,uyghur:0.77,jin:0.84,khw:0.74,rus:0.54,xia:3.0,per:0.48};
-const bpCatOf=p=>p.pol==='steppe'?'mongol':p.pol;
-const _bpRollBirth=rollBirth;
-rollBirth=function(){
-  if(bpDebug()){BP=null;return _bpRollBirth.apply(this,arguments);}
-  const mem=bpLoad();
-  /* 연도: 최근 출생과 같은 10년 구간이면 가중치를 절반씩 */
-  const yw=[];for(let y=1160;y<=1260;y++){const n=mem.filter(m=>m.d===Math.floor(y/10)).length;yw.push([y,Math.pow(.5,n)]);}
-  const year=wpick(yw);
-  const cw=bpWeights(year).map(([c,w])=>[c,w*(BP_SCALE[c]||1)*Math.pow(.5,mem.filter(m=>m.c===c).length)]);
-  const cat=wpick(cw);
-  BP={year,cat};
-  let p=null;
-  try{
-    for(let i=0;i<5;i++){
-      p=_bpRollBirth.apply(this,arguments);
-      const reg=p.region||p.tribe||'';
-      if(!reg||!mem.some(m=>m.r===reg)||p.lineage)break;
-    }
-  }finally{BP=null;}
-  try{mem.push({c:bpCatOf(p),d:Math.floor(p.year/10),r:p.region||p.tribe||''});while(mem.length>6)mem.shift();bpSave();}catch(e){}
-  return p;
-};
 /* ===== v80: 아내의 약탈 피랍(남성 시점) + 가족의 강제 혼인·첩살이 =====
    (A) 남편이 집에 있을 때 약탈자가 천막을 덮쳐 아내를 끌고 간다 → 소식 → 되찾는 원정 / 몸값 교섭 / 복수 / 재회 / 재혼 선택.
        출정 중에 아내가 끌려간 경우(v77 귀환)도 같은 후속 사건으로 이어진다.
