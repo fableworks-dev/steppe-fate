@@ -2944,9 +2944,9 @@ gx('marriage').mk=P=>{
   const A=mkCand(pickAlly(),rk(ri(-1,0)),ri(-3,4)),B=mkCand(sameTribe(),rk(ri(-1,1)),ri(-3,4));
   const done=(c,origin,eff,txt)=>()=>{adopt(c,origin);fx(eff);const m=tribeHook();return txt+(m?'\n'+m:'');};
   const o=[];
-  o.push({t:candShow(A),sub:er?(f?'동맹을 맺은 부족의 혼처 · 시집가면 남편의 부족이 된다':'동맹을 맺은 부족과의 혼인'):'가문이 정해 준 혼처',
+  o.push({t:candShow(A),sub:er?(f?'동맹을 맺은 부족의 혼처 · 시집가면 남편의 부족이 된다':'동맹을 맺은 부족과의 혼인'):'집안끼리 맺는 혼처',
     fn:done(A,'가문이 맺어 준 혼인',{wealth:ri(2,8)+P.rank*2,fame:2},`가문 어른들이 정한 ${A.name}와(과) 혼인했다. 서로 낯설었지만 한 ${hm(P)}에서 살며 차차 정이 들었다.`)});
-  o.push({t:candShow(B),sub:'마음이 맞는 사람 · 연애혼은 같은 부족끼리만 맺는다',
+  o.push({t:candShow(B),sub:'같은 부족의 혼처 · 중매로 만나는 사람 · 같은 부족끼리 맺는다',
     fn:done(B,'사랑으로 맺은 혼인',{hp:3,wit:2,wealth:ri(-4,3)},`${B.name}와(과) 서로 마음이 맞아 혼인했다. 가진 것은 적지만 웃음이 많은 집이 되었다.`)});
   if(P.rank>=3){const C=mkCand(pickAlly(),rk(1),ri(-3,4));
     o.push({t:candShow(C),sub:'권세 있는 가문과의 정략혼 · 신분과 영향력이 오른다',fn:done(C,'정략결혼',{fame:ri(6,14),wealth:ri(6,14),wit:2},`유력 가문의 ${C.name}와(과) 정략혼을 맺었다. 두 가문이 손잡자 세력이 눈에 띄게 커졌다.`)});}
@@ -6448,7 +6448,7 @@ const V12KN={
   birth:['up','＋','탄생'],wed:['up','✓','혼인'],reunion:['up','✓','재회'],
   death:['down','†','부고'],frdeath:['down','†','부고'],missing:['down','?','소식 끊김'],captive:['down','!','포로'],split:['down','!','이산'],
   /* 인편·전언으로 들은 가족 소식(직접 만나지 못함): 손주 탄생·친정/고향 근황·행방 모르던 가족의 생존·시집간 딸/며느리 소식 */
-  grand:['up','＋','인편 소식'],news:['up','✉','인편 소식'],newsbad:['down','✉','인편 소식'],kinsman:['up','✉','친척 소식']
+  grand:['up','＋','인편 소식'],news:['up','✉','인편 소식'],newsbad:['down','✉','인편 소식'],kinsman:['up','✉','친척 소식'],parted:['down','!','이별']
 };
 /* 인편으로 전해진 가족 소식 문장 판별(표시 전용). 일상 지문(옛이야기·국을 건넴 등)과 일반 소식(라마단 등)은 가족 지칭이 없어 제외된다 */
 const V12ROLE='(?:아버지|어머니|형|누나|오빠|언니|남동생|여동생|동생|남편|아내|딸|아들|부인|옛 아내)';
@@ -6456,6 +6456,7 @@ function v12knNews(line){
   if(!line||line.length>170)return null;
   if(/손(?:자|녀)를 얻었으나 아직 얼굴은 보지 못했다/.test(line))return 'grand';
   if(/오래 연락이 끊겼던 먼 친척을 만났다/.test(line))return 'kinsman';
+  if(/^연인 \S+에게 이별을 알렸다\./.test(line))return 'parted';
   if(/(?:종으로 일하며 살아 있다는|혼인을 강요당했다는|강제로 혼인당했다는)/.test(line)&&/(?:이야기|소문|소식)[을를] 들었다/.test(line))return 'newsbad';
   if(new RegExp('^끌려간 '+V12ROLE+' \\S+.*소식을 들었다').test(line))return 'news';
   if(/시집간 딸[^.]*(?:안부|손주 이야기)[^.]*전해|시집간 딸네 소식이 인편으로|며느리 \S+[이가] 친정 소식을 전해 듣고|고향에 새 식구가 태어났다고 한다/.test(line))return 'news';
@@ -6523,7 +6524,7 @@ const V12KCARD={
   birth:['','집안에 새 식구가 늘었다.'],wed:['',''],
   grand:[l=>/손녀를 얻었/.test(l)?'손녀를 얻다':'손자를 얻다',''],kinsman:['먼 친척의 소식',''],
   news:[l=>v12newsTitle(l),''],newsbad:[l=>v12newsTitle(l),''],
-  death:['가족의 부고',''],frdeath:['친구의 부고',''],missing:['가족과 소식이 끊겼다',''],captive:['가족이 끌려갔다',''],split:['가족과 헤어졌다',''],reunion:['가족과 다시 만났다','']
+  death:['가족의 부고',''],frdeath:['친구의 부고',''],missing:['가족과 소식이 끊겼다',''],captive:['가족이 끌려갔다',''],split:['가족과 헤어졌다',''],parted:['연인과 헤어졌다',''],reunion:['가족과 다시 만났다','']
 };
 /* 줄 속에 이름이 나온 가족을 찾는다: 같은 해 같은 소식이 다른 문장(결과문·기록)으로 두 번 나오는 것을 한 장으로 합치기 위함 */
 function v12kinWho(line){
@@ -13443,8 +13444,29 @@ v9ask('ug_temple',1.1,P=>P.pol==='uyghur'&&ugPeace(P)&&P.age>=15&&v7nf(P)&&free(
 v9ask('ug_faith_marry',1.0,P=>P.pol==='uyghur'&&ugPeace(P)&&P.age>=16&&P.age<=32&&!P.spouse&&v7nf(P)&&free(P)&&!P.done.ug_faith_marry,P=>{
   P.done.ug_faith_marry=1;
   const mine=({budd:'불교',nest:'경교',muslim:'이슬람',teng:'옛 풍습'})[P.religion]||'우리 신앙';
-  return v7sc('다른 신앙의 혼담','혼담이 들어왔다. 상대는 좋은 집안의 사람인데, 믿는 신앙이 '+mine+'과(와) 다르다. 오아시스에서는 드문 일이 아니지만, 양가 어른들은 속으로 셈이 복잡하다.',[
-    {t:'신앙이 달라도 혼인을 받아들인다',sub:'식구 사이에 말이 오갈 수 있다',fn:()=>{fx({wealth:ri(1,4),wit:1,fame:-1});return '양가 어른들이 한참 상의한 끝에 혼인을 올렸다. 첫 명절 상에는 두 집의 음식이 함께 올랐다.';}},
+  const other=R(['불교','경교','이슬람','마니교'].filter(x=>x!==mine));
+  /* 마음을 나눈 연인(가까운 사이로 올라선 호감 관계)이 있는지 */
+  let lv=null;try{lv=(typeof cfLover==='function'&&cfLover(P))||null;}catch(e){}
+  if(!lv){try{const t=typeof t3cur==='function'?t3cur(P):null;if(t&&t.stage==='close')lv=t;}catch(e){}}
+  const wed=(txt)=>{
+    const w=makeSpouse('다른 신앙의 혼인',{rank:Math.max(1,P.rank)});w.faith=other;
+    addLog(`${w.name}과(와) 혼인했다. 상대는 ${other}을(를) 따르는 집안이다.`);recapLine(`${w.name}과(와) 혼인했다. 상대는 ${other}을(를) 따르는 집안이다.`);
+    return txt.replace('{sp}',w.name);};
+  const t0='혼담이 들어왔다. 상대는 좋은 집안의 사람인데, 믿는 신앙이 '+mine+'과(와) 다르다('+other+'). 오아시스에서는 드문 일이 아니지만, 양가 어른들은 속으로 셈이 복잡하다.';
+  if(lv){
+    return v7sc('다른 신앙의 혼담',t0+` 하지만 ${P.name}에게는 이미 마음을 나눈 ${lv.name}이(가) 있다.`,[
+      {t:'혼담을 받아들이고 연인과 헤어진다',sub:'연인에게 이별을 알려야 한다',fn:()=>{
+        lv.ended='left';lv.endY=P.year;tieBond(lv,-30);fx({wealth:ri(1,4),wit:1,fame:-2,hp:-2});
+        const s=P.flags&&P.flags.cf;if(s&&!s.done&&(s.state==='lover'||s.state==='family')){s.state='ended';s.done=1;}
+        const brk=`연인 ${lv.name}에게 이별을 알렸다. ${lv.name}은(는) 한참 말이 없다가 고개를 끄덕이고 돌아섰다.`;
+        addLog(brk);recapLine(brk);
+        return wed('양가 어른들이 한참 상의한 끝에 {sp}와(과)의 혼인을 올렸다. 첫 명절 상에는 두 집의 음식이 함께 올랐지만, 마음 한쪽에는 이별을 알리던 날의 뒷모습이 남았다.');}},
+      {t:`이미 연인이 있다며 혼담을 정중히 물린다`,sub:'신의를 지킨다',fn:()=>{tieBond(lv,ri(3,6));fx({fame:1});return `${lv.name}이(가) 마음에 걸려 혼담을 정중히 물렸다. 어른들은 아쉬워했지만 더는 권하지 않았다.`;}},
+      {t:'같은 신앙의 상대를 기다린다',sub:'연인과의 사이는 그대로 둔다',fn:()=>{fx({fame:1});return '혼담을 정중히 물렸다. 어른들은 안도했다.';}}
+    ],'혼인');
+  }
+  return v7sc('다른 신앙의 혼담',t0,[
+    {t:'신앙이 달라도 혼인을 받아들인다',sub:'식구 사이에 말이 오갈 수 있다',fn:()=>{fx({wealth:ri(1,4),wit:1,fame:-1});return wed('양가 어른들이 한참 상의한 끝에 {sp}와(과)의 혼인을 올렸다. 첫 명절 상에는 두 집의 음식이 함께 올랐다.');}},
     {t:'같은 신앙의 상대를 기다린다',fn:()=>{fx({fame:1});return '혼담을 정중히 물렸다. 어른들은 안도했다.';}}
   ],'혼인');
 },{cool:30});
@@ -14649,7 +14671,7 @@ const cfSince=(P,n)=>P.flags.cf&&P.year-P.flags.cf.y>=n;
 (function(){
   ['marriage','v62_arranged','v62_command'].forEach(id=>{
     const e=GEN.find(x=>x.id===id);if(!e)return;const k=e.cond;
-    e.cond=Q=>k(Q)&&!(Q.flags&&Q.flags.cf&&!Q.flags.cf.done&&['lover','family'].includes(Q.flags.cf.state));
+    e.cond=Q=>k(Q)&&!(Q.flags&&Q.flags.cf&&!Q.flags.cf.done&&['lover','family'].includes(Q.flags.cf.state)&&!Q.flags.cf.open);
   });
 })();
 /* 혼인 */
@@ -14760,6 +14782,30 @@ v9ask('cf_two',3,P=>cfTwoOn(P)&&P.year-P.flags.cf.y>=1,cfTwoScene,{cool:1});
       if(s&&s.two&&!s.done&&!P.dead){
         if(P.spouse&&P.spouse.alive){s.two=0;cfEnd(P,'ended');}
         else if(P.year-s.y>=3&&!s.twoQ){s.twoQ=1;const sc2=cfTwoScene(P);if(sc2)G.q.push(sc2);}
+      }
+      /* 다른 사람과 혼인했다면 남은 연인 관계는 끝난다 */
+      if(s&&!s.done&&!P.dead&&P.spouse&&P.spouse.alive&&!P.flags.cfmar&&['lover','family','pending'].includes(s.state)){
+        const nm=s.name;cfEnd(P,'ended');s.two=0;
+        const lt=(P.ties||[]).find(t=>t&&t.kind==='crush'&&t.name===nm&&!t.ended);if(lt){lt.ended='left';lt.endY=P.year;}
+        const ln=`연인 ${nm}에게 이별을 알렸다. ${nm}은(는) 말없이 고개를 끄덕이고 돌아섰다.`;addLog(ln);recapLine(ln);
+      }
+      /* 집안에 알린 뒤 두 해가 지나도록 결말이 나지 않으면 집안의 뜻이 정해지는 장면을 반드시 연다 */
+      else if(s&&!s.done&&!P.dead&&s.state==='family'&&!P.spouse&&P.year-s.y>=2&&!(P.cd&&P.cd.cf_famforce>P.year)){
+        P.cd=P.cd||{};P.cd.cf_famforce=P.year+2;
+        const ge=GEN.find(x=>x.id==='cf_family');const sc3=ge&&ge.mk(P);if(sc3)G.q.push(sc3);
+      }
+      /* 연인 관계가 오래 머물러 있으면 결단의 때가 온다 */
+      else if(s&&!s.done&&!P.dead&&s.state==='lover'&&!s.two&&!P.spouse&&P.year-(s.decY||s.y)>=3&&!(P.cd&&P.cd.cf_decide>P.year)){
+        P.cd=P.cd||{};P.cd.cf_decide=P.year+1;s.decY=P.year;
+        const nm=s.name;
+        G.q.push(v7sc('이어 갈 길',`${nm}와(과) 만난 지 몇 해가 지났다. 연인으로만 지내는 사이에도 사람들의 눈은 달라지고 집안의 말도 나온다. ${P.name}은(는) 이제 이 사이를 어떻게 할지 정해야 한다.`,[
+          {t:'집안에 알리고 혼인을 청한다',sub:'집안의 뜻을 구한다',fn:()=>{s.state='family';s.y=P.year;fx({fame:1});return `${P.name}은(는) 집안에 ${nm}의 이야기를 꺼내기로 마음먹었다. ${nm}은(는) 놀랐으나 곧 고개를 끄덕였다.`;}},
+          {t:'지금은 연인으로 지낸다',sub:'혼담이 들어오면 받아들일 수도 있다',fn:()=>{s.open=1;return `두 사람은 서두르지 않기로 했다. 다만 집안에서 혼담이 들어오면 그때 다시 이야기하기로 했다.`;}},
+          {t:'마음을 접고 헤어진다',sub:'이별을 알린다',fn:()=>{
+            cfEnd(P,'ended');const lt=(P.ties||[]).find(t=>t&&t.kind==='crush'&&t.name===nm&&!t.ended);if(lt){lt.ended='left';lt.endY=P.year;}
+            const ln=`연인 ${nm}에게 이별을 알렸다. ${nm}은(는) 한참 말이 없다가 돌아섰다.`;addLog(ln);recapLine(ln);fx({hp:-2,wit:1});
+            return `${P.name}은(는) ${nm}에게 이제 각자의 길을 가자고 말했다. 돌아오는 길이 한참 길었다.`;}}
+        ],'혼인'));
       }
     }catch(e){}
     return r;
