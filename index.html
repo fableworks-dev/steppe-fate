@@ -14919,6 +14919,32 @@ V7POOLS.push(
   "{me}은(는) 가끔 처음 마음을 전해 오던 날의 일을 떠올렸다. 그때 다른 답을 했다면 지금의 집은 없었을 것이다.",
   "두 사람은 밥상 앞에서 말없이 마주 앉아도 어색하지 않았다. 처음의 설렘은 어느새 익숙한 편안함이 되어 있었다."]]
 );
+
+/* ===== 오래된 연인의 혼인 장면 =====
+   마음이 통한 사이(close)가 두 해 넘게 이어졌고 혼인할 수 있는 상대인데 아직 혼인하지 않았다면, 무작위 혼담을 기다리지 않고 결단의 장면을 연다. */
+(function(){
+  const yn=yearNews;
+  yearNews=function(){
+    const r=yn.apply(this,arguments);
+    try{
+      if(P&&!P.dead&&!(P.spouse&&P.spouse.alive)&&P.age>=16&&!cfLoverOn(P)&&!(P.cd&&P.cd.lv_prop>P.year)&&typeof t3legal==='function'){
+        const t=tieList(P).find(x=>x.kind==='crush'&&t3legal(P,x)&&P.year-(x.closeSince||P.year)>=2);
+        if(t){
+          P.cd=P.cd||{};P.cd.lv_prop=P.year+3;
+          const n=t.name,lv=t3love(P,t);
+          G.q.push(v7sc('오래 마음을 나눈 사람',`${n}와(과) 마음을 나눈 지 몇 해가 지났다. 주변에서도 두 사람의 사이를 아는 눈치고, 이제 이 사이를 어떻게 할지 정해야 할 때가 되었다.`,[
+            {t:`${n}에게 혼인을 청한다`,sub:lv?'두 집안이 혼담을 주고받는다':'동맹 부족의 혼처로 혼담이 오간다',fn:()=>t3wed(P,t,`${n}에게 혼인을 청했다. ${n}은(는) 오래 기다렸다는 듯 고개를 끄덕였고, 두 집안이 혼담을 주고받아 혼인이 이루어졌다.`,!lv)},
+            {t:'조금 더 기다린다',sub:'몇 해 뒤 다시 이야기하게 된다',fn:()=>{fx({wit:1});return `아직은 때가 아니라며 말을 아꼈다. ${n}은(는) 서운한 기색 없이 기다리겠다고 했다.`;}},
+            {t:'마음을 접고 헤어진다',sub:'이별을 알린다',fn:()=>{t.ended='left';t.endY=P.year;tieBond(t,-30);fx({hp:-2,wit:1});
+              const ln=`연인 ${n}에게 이별을 알렸다. ${n}은(는) 한참 말이 없다가 돌아섰다.`;addLog(ln);recapLine(ln);
+              return `${P.name}은(는) ${n}에게 이제 각자의 길을 가자고 말했다. 돌아오는 길이 한참 길었다.`;}}
+          ],'혼인'));
+        }
+      }
+    }catch(e){}
+    return r;
+  };
+})();
 /* ===== v74: 노예의 삶 이벤트 보강 (남녀 공통 + 남성·여성 각각) =====
    v12_slave.js 의 주인 구조(P.master: name, kind, temper, pol, since)를 이어 쓴다.
    표현은 절제하고, 신체 학대·성적 위협은 사실을 담담히 적는 데 그친다. */
